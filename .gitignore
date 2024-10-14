@@ -1,2 +1,6 @@
 .DS_Store
 /project_data
+poetry.lock
+pyproject.toml
+Handout.pdf
+train_data_sample.csv
