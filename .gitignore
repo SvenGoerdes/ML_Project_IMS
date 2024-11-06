@@ -1,5 +1,8 @@
 .DS_Store
-/project_data
+project_data/sample_data_gpt.csv
+project_data/test_data.csv
+project_data/train_data.csv
+project_data/sample_submission.csv
 poetry.lock
 pyproject.toml
 Handout.pdf
@@ -12,3 +15,4 @@ do_be_deleted_multivariate_analysis.ipynb
 tb_delted/Curiosity_files.ipynb
 tb_delted/to_be_deleted_multivariate_analysis.ipynb
 Wide_Variety_of_Models.pdf
+/tb_deleted
