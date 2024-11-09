@@ -72,6 +72,7 @@ def days_between(df, start_date_col, end_date_col):
     """
     return (df[end_date_col] - df[start_date_col]).dt.days
 
+<<<<<<< HEAD
 def target_encode_multiclass(X_train_df, X_val_df, y_train,  feature_col, target_col):
     """
     Applies target encoding to a categorical feature for each class in a multi-class target variable.
@@ -118,3 +119,31 @@ def target_encode_multiclass(X_train_df, X_val_df, y_train,  feature_col, target
 
     # return both the training and validation set
     return X_train_encoded, X_val_encoded
+=======
+
+
+def remove_outliers_iqr(df, columns, threshold=1.5):
+    df_filtered = df.copy()
+
+    # Calculate Q1, Q3, and IQR for each column
+    for col in columns:
+        Q1 = df_filtered[col].quantile(0.25)
+        Q3 = df_filtered[col].quantile(0.75)
+        IQR = Q3 - Q1
+
+        # Lower and upper bound for each column
+        low_bound = Q1 - threshold * IQR
+        up_bound = Q3 + threshold * IQR
+
+        # Rows in beginning vs end
+        initial_count = df_filtered.shape[0]
+        df_filtered = df_filtered[(df_filtered[col] >= low_bound) & (df_filtered[col] <= up_bound)]
+        final_count = df_filtered.shape[0]
+
+        # Calculate and print the percentage of outliers removed
+        outliers_removed = initial_count - final_count
+        outlier_percentage = (outliers_removed / initial_count) * 100
+        print(f'number removed:{outliers_removed}')
+
+    return low_bound, up_bound, df_filtered
+>>>>>>> 9aa2afcb95db5402b44404b850db9df47cffd5bb
