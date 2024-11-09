@@ -1,5 +1,92 @@
 import pandas as pd
 from category_encoders import TargetEncoder
+import numpy as np
+
+def missing_data(df):
+    """
+    Gives the count and percentage of missing values for each column in a DataFrame
+    """    
+    # Number of missing values in each column
+    missing_count = df.isnull().sum()
+    
+    # Percentage of missing values for each column
+    missing_percentage = ((missing_count / df.shape[0]) * 100).round(2)
+    
+    missing_data = pd.DataFrame({
+        'Missing Count': missing_count,
+        'Missing %': missing_percentage
+    })
+    
+    # Show only columns with missing values
+    missing_data = missing_data[missing_data['Missing Count'] > 0]
+    
+    # Sort in descending order
+    missing_data = missing_data.sort_values(by='Missing Count', ascending=False)
+    return missing_data
+
+def multiple_unique_values(df,group_column, unique_column):
+    """
+    Identifies `group_column` that have more than one unique value
+
+    """
+    # Group by group_column and count unique values in the unique_column
+    unique_count = df.groupby(group_column)[unique_column].nunique()
+    
+    # Filter for cases with more than one unique value
+    multiple_types = unique_count[unique_count > 1]
+    
+    print(f"{group_column} with more than one unique value in {unique_column}:")
+    for group in multiple_types.index:
+        unique_values = df[df[group_column] == group][unique_column].unique()
+        print(f"{group}: {unique_values}")
+
+def invalid_entries(df, date_1, date_2):
+    """
+    Identifies invalid entries where the first date is greater than the second date
+    """
+    # Validate the dates
+    valid_dates = df[date_1] <= df[date_2]
+    
+    # Find invalid entries where the dates are not valid and the columns are not null
+    invalid = df[~valid_dates & df[date_1].notna() & df[date_2].notna()]
+    
+    # Print the number of invalid rows
+    print(f"Number of invalid entries in {date_1} vs {date_2}: {invalid.shape[0]}")
+    
+    return invalid
+
+def impute_dates_with_difference(df, target_column, reference_column, condition_column, difference_in_days):
+    """
+    Imputes values in a target date column where a specified condition is met, using a given
+    difference in days.
+
+    """
+    # Define a timedelta based on the median difference in days
+    timedelta = pd.Timedelta(days=difference_in_days)
+
+    # Define the condition for rows to impute
+    condition = (df[condition_column] > df[target_column]) & df[reference_column].notna() & df[target_column].notna()
+    
+    # Apply the imputation
+    df.loc[condition, target_column] = df.loc[condition, reference_column] + timedelta
+    
+    return df
+
+
+def impute_prop(values, proportions, X, column_name):
+    # Calculate the number of missing values
+    missing_count = X[column_name].isnull().sum()
+    
+    # Generate imputed values based on proportions
+    imputed_values = np.random.choice(values, size=missing_count, p=proportions)
+    
+    # Fill in the missing values directly
+    X.loc[X[column_name].isnull(), column_name] = imputed_values
+    
+    return X
+
+
+
 
 def impute_with(df: pd.DataFrame, target_column: str, group_column = None, unknown_values=['Unknown'], reference_df=None, metric = 'mode'):
     """
@@ -72,7 +159,6 @@ def days_between(df, start_date_col, end_date_col):
     """
     return (df[end_date_col] - df[start_date_col]).dt.days
 
-<<<<<<< HEAD
 def target_encode_multiclass(X_train_df, X_val_df, y_train,  feature_col, target_col):
     """
     Applies target encoding to a categorical feature for each class in a multi-class target variable.
@@ -119,8 +205,6 @@ def target_encode_multiclass(X_train_df, X_val_df, y_train,  feature_col, target
 
     # return both the training and validation set
     return X_train_encoded, X_val_encoded
-=======
-
 
 def remove_outliers_iqr(df, columns, threshold=1.5):
     df_filtered = df.copy()
@@ -146,4 +230,4 @@ def remove_outliers_iqr(df, columns, threshold=1.5):
         print(f'number removed:{outliers_removed}')
 
     return low_bound, up_bound, df_filtered
->>>>>>> 9aa2afcb95db5402b44404b850db9df47cffd5bb
+
