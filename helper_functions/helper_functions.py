@@ -1,4 +1,5 @@
 import pandas as pd
+from category_encoders import TargetEncoder
 
 def impute_with(df: pd.DataFrame, target_column: str, group_column = None, unknown_values=['Unknown'], reference_df=None, metric = 'mode'):
     """
@@ -70,3 +71,50 @@ def days_between(df, start_date_col, end_date_col):
     - Series containing the difference in days between the two columns.
     """
     return (df[end_date_col] - df[start_date_col]).dt.days
+
+def target_encode_multiclass(X_train_df, X_val_df, y_train,  feature_col, target_col):
+    """
+    Applies target encoding to a categorical feature for each class in a multi-class target variable.
+
+    Parameters:
+    - X_train (pd.DataFrame): The training feature set.
+    - y_train (pd.DataFrame or pd.Series): The training target variable.
+    - feature_col (str): The name of the categorical feature column to encode.
+    - target_col (str): The name of the target variable column.
+
+    Returns:
+    - pd.DataFrame: The original training set concatenated with the encoded features.
+    """
+
+
+    # Ensure y_train is a DataFrame
+    if isinstance(y_train, pd.Series):
+        y_train = y_train.to_frame()
+
+    # Initialize an empty DataFrame to store encoded features
+    encoded_features_train = pd.DataFrame(index=X_train.index)
+    encoded_features_val = pd.DataFrame(index=X_val.index)
+    # Loop through each unique category in the targetf
+    for outcome in y_train[target_col].unique():
+        # Binary target for the current outcome
+        y_binary = (y_train[target_col] == outcome).astype(int)
+
+        # Apply target encoding for this outcome
+        encoder = TargetEncoder(cols=[feature_col])
+
+        # Fit and transform the training set,
+        encoded_column_train = encoder.fit_transform(X_train_df[[feature_col]], y_binary)
+
+        # then transform the validation set using the y_train binary target to avoid data leakage
+        encoded_column_val = encoder.transform(X_val_df[[feature_col]])
+
+        # Rename and add the encoded column to the DataFrame
+        encoded_features_train[f'{feature_col}_encoded_{outcome}'] = encoded_column_train[feature_col]
+        encoded_features_val[f'{feature_col}_encoded_{outcome}'] = encoded_column_val[feature_col]
+
+    # Concatenate the encoded columns with the original training set
+    X_train_encoded = pd.concat([X_train_df.reset_index(drop=True), encoded_features_train.reset_index(drop=True)], axis=1)
+    X_val_encoded = pd.concat([X_val_df.reset_index(drop=True), encoded_features_val.reset_index(drop=True)], axis=1)
+
+    # return both the training and validation set
+    return X_train_encoded, X_val_encoded
