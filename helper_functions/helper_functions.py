@@ -11,7 +11,7 @@ def impute_with(df: pd.DataFrame, target_column: str, group_column = None, unkno
     - df: DataFrame containing the data to be imputed.
     - target_column: The column in which to impute missing/unknown values.
     - group_column: The column to group by for determining the mode for imputation.
-    - unknown_values: List of values to be considered as 'unknown' (default is ['Unknown']).
+    - unknown_values: Optional List of values to be considered as 'unknown' (default is ['Unknown']).
                       NaN values in the target column are also included and will be imputed.
     - reference_df: Optional DataFrame to calculate modes from (e.g., training set for validation imputation).
                     If None, modes are calculated from df.
@@ -92,8 +92,8 @@ def target_encode_multiclass(X_train_df, X_val_df, y_train,  feature_col, target
         y_train = y_train.to_frame()
 
     # Initialize an empty DataFrame to store encoded features
-    encoded_features_train = pd.DataFrame(index=X_train.index)
-    encoded_features_val = pd.DataFrame(index=X_val.index)
+    encoded_features_train = pd.DataFrame(index=X_train_df.index)
+    encoded_features_val = pd.DataFrame(index=X_val_df.index)
     # Loop through each unique category in the targetf
     for outcome in y_train[target_col].unique():
         # Binary target for the current outcome
