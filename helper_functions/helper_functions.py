@@ -258,3 +258,34 @@ def remove_outliers_iqr(df, column, threshold=1.5):
     # Return the bounds and the filtered dataframe
     return low_bound, up_bound, df_filtered
 
+def iqr_date(df, date_column):
+    """
+    Calculate IQR for a date column and identify outliers.
+    
+    Parameters:
+    - df: DataFrame.
+    - date_column: Name of the column that we want to check outliers for.  
+    Returns:
+    - lower_bound_date: The lower bound date for identifying outliers.
+    - upper_bound_date: The upper bound date for identifying outliers.
+    """
+    #Need to convert date to numeric stamps
+    timestamps = df[date_column].dropna().apply(lambda x: x.timestamp())
+
+    Q1 = timestamps.quantile(0.25)
+    Q3 = timestamps.quantile(0.75)
+    IQR = Q3 - Q1
+
+    lower_bound_timestamp = Q1 - 1.5 * IQR
+    upper_bound_timestamp = Q3 + 1.5 * IQR
+
+    lower_bound_date = pd.to_datetime(lower_bound_timestamp, unit='s')
+    upper_bound_date = pd.to_datetime(upper_bound_timestamp, unit='s')
+
+    outlier_count = ((df[date_column] < lower_bound_date) | (df[date_column] > upper_bound_date)).sum()
+
+    print(f"Lower Bound Date for {date_column}: {lower_bound_date}")
+    print(f"Upper Bound Date for {date_column}: {upper_bound_date}")
+    print(f"Number of outliers in {date_column}: {outlier_count}")
+
+    return lower_bound_date, upper_bound_date
