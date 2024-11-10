@@ -203,30 +203,61 @@ def target_encode_multiclass(X_train_df, X_val_df, y_train,  feature_col, target
     # return both the training and validation set
     return X_train_encoded, X_val_encoded
 
-def remove_outliers_iqr(df, columns, threshold=1.5):
+def log_remove_outliers_iqr(df, column, threshold=1.5):
     df_filtered = df.copy()
 
-    # Calculate Q1, Q3, and IQR for each column
-    for col in columns:
-        Q1 = df_filtered[columns].quantile(0.25)
-        Q3 = df_filtered[columns].quantile(0.75)
-        IQR = Q3 - Q1
+    # Calculate Q1, Q3, and IQR for the specified column
+    Q1 = df_filtered[column].quantile(0.25)
+    Q3 = df_filtered[column].quantile(0.75)
+    IQR = Q3 - Q1
 
-        # Lower and upper bound for each column
-        low_bound = Q1 - threshold * IQR
-        up_bound = Q3 + threshold * IQR
+    # Lower and upper bound for the column
+    low_bound = Q1 - threshold * IQR
+    up_bound = Q3 + threshold * IQR
 
-        # Rows in beginning vs end
-        initial_count = df_filtered.shape[0]
-        df_filtered = df_filtered[(df_filtered[col] >= low_bound) & (df_filtered[col] <= up_bound)]
-        final_count = df_filtered.shape[0]
+    # Rows in beginning vs end
+    initial_count = df_filtered.shape[0]
+    df_filtered = df_filtered[(df_filtered[column] >= low_bound) & (df_filtered[column] <= up_bound)]
+    final_count = df_filtered.shape[0]
 
-        # Calculate and print the percentage of outliers removed
-        outliers_removed = initial_count - final_count
-        outlier_percentage = (outliers_removed / initial_count) * 100
-        print(f'number removed:{outliers_removed}')
+    # Calculate and print the percentage of outliers removed
+    # outliers_removed = initial_count - final_count
+    # outlier_percentage = (outliers_removed / initial_count) * 100
 
+    print(f'Lower bound: {np.expm1(low_bound)}') # exponential + 1
+    print(f'Upper bound: {np.expm1(up_bound)}')
+    # print(f'Number removed: {outliers_removed}')
+
+    # Return the bounds and the filtered dataframe
+    return np.expm1(low_bound), np.expm1(up_bound), df_filtered
+
+def remove_outliers_iqr(df, column, threshold=1.5):
+    df_filtered = df.copy()
+
+    # Calculate Q1, Q3, and IQR for the specified column
+    Q1 = df_filtered[column].quantile(0.25)
+    Q3 = df_filtered[column].quantile(0.75)
+    IQR = Q3 - Q1
+
+    # Lower and upper bound for the column
+    low_bound = Q1 - threshold * IQR
+    up_bound = Q3 + threshold * IQR
+
+    # Rows in beginning vs end
+    initial_count = df_filtered.shape[0]
+    df_filtered = df_filtered[(df_filtered[column] >= low_bound) & (df_filtered[column] <= up_bound)]
+    final_count = df_filtered.shape[0]
+
+    # outliers_removed = initial_count - final_count
+    # outlier_percentage = (outliers_removed / initial_count) * 100
+
+    print(f'Lower bound: {low_bound}') 
+    print(f'Upper bound: {up_bound}')
+    # print(f'Number of outliers in {column}: {outliers_removed}')
+
+    # Return the bounds and the filtered dataframe
     return low_bound, up_bound, df_filtered
+
 
 def iqr_date(df, date_column):
     """
