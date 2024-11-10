@@ -208,8 +208,8 @@ def remove_outliers_iqr(df, columns, threshold=1.5):
 
     # Calculate Q1, Q3, and IQR for each column
     for col in columns:
-        Q1 = df_filtered[col].quantile(0.25)
-        Q3 = df_filtered[col].quantile(0.75)
+        Q1 = df_filtered[columns].quantile(0.25)
+        Q3 = df_filtered[columns].quantile(0.75)
         IQR = Q3 - Q1
 
         # Lower and upper bound for each column
