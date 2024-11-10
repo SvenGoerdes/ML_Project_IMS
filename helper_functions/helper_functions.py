@@ -85,9 +85,6 @@ def impute_prop(values, proportions, X, column_name):
     
     return X
 
-
-
-
 def impute_with(df: pd.DataFrame, target_column: str, group_column = None, unknown_values=['Unknown'], reference_df=None, metric = 'mode'):
     """
     Imputes missing (NaN) or specified unknown values in a target column based on the most common value (mode) 
