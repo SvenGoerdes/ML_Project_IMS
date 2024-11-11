@@ -258,7 +258,6 @@ def remove_outliers_iqr(df, column, threshold=1.5):
     # Return the bounds and the filtered dataframe
     return low_bound, up_bound, df_filtered
 
-
 def iqr_date(df, date_column):
     """
     Calculate IQR for a date column and identify outliers.
