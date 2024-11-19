@@ -513,7 +513,6 @@ X_val = X_val.drop(columns=['Agreement Reached'])
 # ================================================================================
 
 
-
 # ================================================================================
 # 5.2 Outlier Detection and Treatment
 # ================================================================================
@@ -524,7 +523,6 @@ X_val_copy = X_val.copy()
 # 5.2.1 Date Outliers -----------------------------------------------------------
 # Create a list with all the date variables
 dates=['Accident Date','Assembly Date','C-2 Date','C-3 Date','First Hearing Date']
-X_train_copy[dates].describe()
 
 # List with the date columns with outliers
 dates_with_outliers = ['Accident Date','C-2 Date','C-3 Date']
@@ -550,8 +548,6 @@ initial_count = X_val_copy.shape[0]
 X_val_copy = X_val_copy[X_val_copy['days_between_accident_assembly']<upper]
 
 final_count = X_val_copy.shape[0]
-
-print(f"Number of rows removed: {initial_count-final_count}")
 
 # Dropping the columns created
 X_train_copy = X_train_copy.drop('days_between_accident_assembly', axis=1)
