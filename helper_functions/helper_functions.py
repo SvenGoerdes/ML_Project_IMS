@@ -289,3 +289,28 @@ def iqr_date(df, date_column):
     print(f"Number of outliers in {date_column}: {outlier_count}")
 
     return lower_bound_date, upper_bound_date
+
+def analyze_distribution(df, column, target, value=None):
+    """
+    Analyzes the distribution of a target column based on the presence of missing values or a specific value in the specified column.
+    """
+    if value is None:  # Handle missing values
+        group_1 = df[df[column].isna()]
+        group_2 = df[df[column].notna()]
+        group_label = "missing"
+        not_group_label = "NOT missing"
+    else:  # Handle cases with a specific value
+        group_1 = df[df[column] == value]
+        group_2 = df[df[column] != value]
+        group_label = f"= {value}"
+        not_group_label = f"!= {value}"
+
+    # Distribution of the target in both groups
+    dist_group_1 = group_1[target].value_counts(normalize=True) * 100
+    dist_group_2 = group_2[target].value_counts(normalize=True) * 100
+
+    # Print results
+    print(f"Distribution of '{target}' when '{column}' {not_group_label}")
+    print(dist_group_2, "\n")
+    print(f"Distribution of '{target}' when '{column}' {group_label}")
+    print(dist_group_1)
