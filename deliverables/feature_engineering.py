@@ -16,9 +16,9 @@ import seaborn as sns
 
 
 # read in project_data
-df_train = pd.read_csv('../project_data/X_train.csv')
-df_val = pd.read_csv('../project_data/X_val.csv')
-df_test = pd.read_csv('../project_data/X_test.csv')
+df_train = pd.read_csv('../project_data/X_train_encoded.csv')
+df_val = pd.read_csv('../project_data/X_val_encoded.csv')
+df_test = pd.read_csv('../project_data/X_test_encoded.csv')
 
 
 # create new seasonality features
@@ -43,8 +43,18 @@ def process_dates(df, date_column):
         4: 'winter'
         }
 
+
         df[f'{date_column}_Season'] = df[f'{date_column}_Season'].map(season_dict)
 
+        # create a dummy variable for the season with int encoding
+        df = pd.get_dummies(df, columns=[f'{date_column}_Season'], drop_first=True)
+        
+        # convert each dummy column into int  
+        for col in df.columns[df.columns.str.contains('Accident Date_Season')]:
+            df[col] = df[col].astype(int)
+
+        # drop the data_column
+        df = df.drop(columns=[date_column])
 
     return df
 
@@ -59,9 +69,9 @@ df_train = process_dates(df_train, 'Accident Date')
 df_val = process_dates(df_val, 'Accident Date')
 df_test = process_dates(df_test, 'Accident Date')
 
-df_train =  create_missing_column(df_train, 'Accident Date')
-df_val =  create_missing_column(df_val, 'Accident Date')
-df_test =  create_missing_column(df_test, 'Accident Date')
+df_train =  create_missing_column(df_train, 'Average Weekly Wage')
+df_val =  create_missing_column(df_val, 'Average Weekly Wage')
+df_test =  create_missing_column(df_test, 'Average Weekly Wage')
 
 # Principal Component Analysis (PCA)
 
