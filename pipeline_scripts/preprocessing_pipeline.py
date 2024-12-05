@@ -2,6 +2,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from category_encoders import TargetEncoder
 from sklearn.preprocessing import LabelEncoder, FunctionTransformer, OneHotEncoder
 import pandas as pd
+import numpy as np
 
 class BinaryEncoder(BaseEstimator, TransformerMixin):
     def __init__(self, binary_columns):
@@ -33,15 +34,15 @@ class MultipleTargetEncoder(BaseEstimator, TransformerMixin):
         self.target_encoders = {}  # Store the target encoders for each column 
 
     def fit(self, X, y):
-        X = X.copy()  # Avoid modifying the original DataFrame
+
         for unique_value in y.unique():
             
             # for every unique value there needs to be one new column
             y_binary = (y == unique_value).astype(int)
 
+            # create a target encoder for each unique value of the target column
             target_encoder = TargetEncoder(cols=[self.feature_column])
-            X[self.feature_column] = X[self.feature_column].astype('category')
-            
+
             # fit the encoder
             target_encoder.fit(X[[self.feature_column]], y_binary)
 
@@ -84,7 +85,7 @@ class DummyEncoder(BaseEstimator, TransformerMixin):
         self.encoder = OneHotEncoder(drop = self.drop)
 
     def fit(self, X, y=None):
-        X = X.copy()  # Avoid modifying the original DataFrame
+        # X = X.copy()  # Avoid modifying the original DataFrame
         self.encoder.fit(X[[self.dummy_column]])
         return self
 
@@ -130,4 +131,67 @@ class NAIndicatorEncoder(BaseEstimator, TransformerMixin):
         # Encode the column as 1 for not NA and 0 for NA
         X[self.column_name] = X[self.column_name].notna().astype(int)
         
+        return X
+
+class SeasonTransformer(BaseEstimator, TransformerMixin):
+    def __init__(self, date_column ):
+        self.date_column = date_column
+        self.season_dict = {
+            "Spring": 1,
+            "Summer": 2,
+            "Autumn": 3,
+            "Winter": 4
+        }
+    
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        X = X.copy()
+        X[f'{self.date_column}_Season'] = X[self.date_column].dt.month % 12 // 3 + 1
+        X[f'{self.date_column}_Season'] = X[f'{self.date_column}_Season'].map(self.season_dict)
+        return X
+
+class CategorizeIncomeDescriptive(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        pass  # No hyperparameters to initialize
+
+    def fit(self, X, y=None):
+        # Calculate adjusted quantiles
+        self.low_threshold_ = X['Average Weekly Wage'].quantile(0.25)
+        self.high_threshold_ = X['Average Weekly Wage'].quantile(0.85)
+        return self
+
+    def transform(self, X):
+        # Create a copy to avoid altering the original data
+        X = X.copy()
+        
+        # Define conditions and choices for vectorized selection
+        conditions = [
+            X['Average Weekly Wage'] <= self.low_threshold_,
+            (X['Average Weekly Wage'] > self.low_threshold_) & (X['Average Weekly Wage'] <= self.high_threshold_),
+            X['Average Weekly Wage'] > self.high_threshold_
+        ]
+        choices = ['Low Income', 'Middle Class', 'Wealthy']
+        
+        # Apply the vectorized selection
+        X['Income_Category'] = np.select(conditions, choices, default='Unknown')
+        return X
+    
+
+class NumberBinning(BaseEstimator, TransformerMixin): 
+    def __init__(self, init_col_name , column_name, bins = [0, 29, 50, 1000], labels = ['Young Workforce', 'Middle-Age', 'Older']):
+        self.initial_column_name = init_col_name
+        self.new_column_name = column_name
+
+        self.bins = bins
+        self.labels = labels
+    
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+
+        X = X.copy()
+        X.loc[:, self.new_column_name] = pd.cut(X[self.initial_column_name], bins=self.bins, labels=self.labels)
         return X
