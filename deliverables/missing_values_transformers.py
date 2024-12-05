@@ -241,3 +241,90 @@ class FillNaNValues(BaseEstimator, TransformerMixin):
         # Fill missing values in the specified column
         X_copy[self.column] = X_copy[self.column].fillna(self.fill_value)
         return X_copy
+    
+
+from sklearn.base import BaseEstimator, TransformerMixin
+
+class ImputeWithUnknownWCIO(BaseEstimator, TransformerMixin):
+    def __init__(self, columns_code, columns_desc, default_code=100, default_desc="Unknown"):
+        """
+        Custom transformer to impute missing rows where all specified columns are NaN.
+        
+        Args:
+            columns_code (list): List of columns containing codes.
+            columns_desc (list): List of columns containing descriptions.
+            default_code (int): Default value for code columns.
+            default_desc (str): Default value for description columns.
+        """
+        self.columns_code = columns_code
+        self.columns_desc = columns_desc
+        self.default_code = default_code
+        self.default_desc = default_desc
+    
+    def fit(self, X, y=None):
+        # No fitting is necessary for this transformer
+        return self
+    
+    def transform(self, X):
+        # Ensure we don't modify the original DataFrame
+        X_copy = X.copy()
+        
+        # Combine code and description columns for the condition
+        missing_condition = X_copy[self.columns_code + self.columns_desc].isna().all(axis=1)
+        
+        # Apply default values for code and description columns
+        for col in self.columns_code:
+            X_copy.loc[missing_condition, col] = self.default_code
+        for col in self.columns_desc:
+            X_copy.loc[missing_condition, col] = self.default_desc
+        
+        return X_copy
+
+
+class FillMissingDescriptionsWithMapping(BaseEstimator, TransformerMixin):
+    def __init__(self, code_column, description_column):
+        self.code_column = code_column
+        self.description_column = description_column
+    
+    def fit(self, X, y=None):
+        # Create a DataFrame with unique WCIO Part Of Body Codes and their descriptions (excluding missing descriptions)
+        body_code_description = X[[self.code_column, self.description_column]].drop_duplicates()
+        body_code_description = body_code_description[body_code_description[self.description_column].notna()]
+        
+        # Create a dictionary to map codes to descriptions
+        self.mapping_dict = body_code_description.set_index(self.code_column)[self.description_column].to_dict()
+        return self
+    
+    def transform(self, X):
+        # Create a copy to avoid modifying the original data
+        X_copy = X.copy()
+        
+        # Fill missing descriptions based on the mapping
+        X_copy[self.description_column] = X_copy.apply(
+            lambda row: self.mapping_dict.get(row[self.code_column], row[self.description_column])
+            if pd.isna(row[self.description_column]) else row[self.description_column],
+            axis=1
+        )
+        
+        return X_copy
+
+class ImputeUsingModeAfterGrouping(BaseEstimator, TransformerMixin):
+    def __init__(self, grouping_column, column_to_impute):
+        self.grouping_column = grouping_column  # The column to use for grouping
+        self.column_to_impute = column_to_impute  # The column to impute
+
+    def fit(self, X, y=None):
+        # Calculate the most frequent (mode) value of the column_to_impute based on the grouping_column
+        self.modes = X.groupby(self.grouping_column)[self.column_to_impute].apply(lambda x: x.mode()[0])
+        return self
+
+    def transform(self, X):
+        X_copy = X.copy()
+        for i, row in X_copy.iterrows():
+            if pd.isna(row[self.column_to_impute]):  # If the column_to_impute is NaN
+                grouping_value = row[self.grouping_column]
+                # Fill the missing column_to_impute with the mode of the corresponding group
+                if grouping_value in self.modes:
+                    X_copy.at[i, self.column_to_impute] = self.modes[grouping_value]
+        return X_copy
+
