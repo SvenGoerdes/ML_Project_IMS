@@ -24,14 +24,6 @@ class IncoWCIOBodyCode(BaseEstimator, TransformerMixin):
         X.loc[X['WCIO Part Of Body Code'] == 90, 'WCIO Part Of Body Description'] = 'MULTIPLE BODY PARTS'
         return X
 
-# Custom transformer to replace zero wages with NaN
-class IncoZeroAWW(BaseEstimator, TransformerMixin):
-    def fit(self, X, y=None):
-        return self
-    def transform(self, X):
-        X = X.copy()
-        X.loc[X['Average Weekly Wage'] == 0, 'Average Weekly Wage'] = np.nan
-        return X
 
 # Custom transformer to handle zero birth year values
 
@@ -134,3 +126,11 @@ class IncoCovidIndicator(BaseEstimator, TransformerMixin):
         X.loc[(X['COVID-19 Indicator'] == 'Y') & (X['Accident Date'] < "2020-03-01"), 'COVID-19 Indicator'] = 'N'
         return X
 
+# Custom transformer for Gender
+class IncoGenderNaN(BaseEstimator, TransformerMixin):
+    def fit(self, X, y=None):
+        return self
+    def transform(self, X):
+        X = X.copy()
+        X.loc[X['Gender']=='X','Gender'] = np.nan
+        return X
