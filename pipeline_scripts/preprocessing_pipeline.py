@@ -138,24 +138,45 @@ class NAIndicatorEncoder(BaseEstimator, TransformerMixin):
         X[f'{self.column_name}_nabinary'] = X[self.column_name].notna().astype(int)
         
         return X
-
+    
 class SeasonTransformer(BaseEstimator, TransformerMixin):
-    def __init__(self, date_column ):
+    def __init__(self, date_column, categorical=True):
         self.date_column = date_column
+        self.categorical = categorical
         self.season_dict = {
-            "Spring": 1,
-            "Summer": 2,
-            "Autumn": 3,
-            "Winter": 4
+            1: 'Winter',  # Dec (12), Jan (1), Feb (2)
+            2: 'Spring',  # Mar (3), Apr (4), May (5)
+            3: 'Summer',  # Jun (6), Jul (7), Aug (8)
+            4: 'Fall'     # Sep (9), Oct (10), Nov (11)
         }
     
     def fit(self, X, y=None):
+        if self.date_column not in X.columns:
+            raise ValueError(f"Column {self.date_column} not found in input data")
         return self
+
+    def get_season(self, month):
+        if month == 12:
+            return 1  # Winter
+        return (month % 12 + 3) // 3
 
     def transform(self, X):
         X = X.copy()
-        X[f'{self.date_column}_Season'] = X[self.date_column].dt.month % 12 // 3 + 1
-        X[f'{self.date_column}_Season'] = X[f'{self.date_column}_Season'].map(self.season_dict)
+        
+        # Ensure date column is datetime
+        if not pd.api.types.is_datetime64_any_dtype(X[self.date_column]):
+            try:
+                X[self.date_column] = pd.to_datetime(X[self.date_column])
+            except:
+                raise ValueError(f"Could not convert {self.date_column} to datetime")
+        
+        # Calculate season number (1-4)
+        X[f'{self.date_column}_Season'] = X[self.date_column].dt.month.apply(self.get_season)
+        
+        # Convert to categorical if requested
+        if self.categorical:
+            X[f'{self.date_column}_Season'] = X[f'{self.date_column}_Season'].map(self.season_dict)
+        
         return X
 
 class CategorizeIncomeDescriptive(BaseEstimator, TransformerMixin):
@@ -248,7 +269,6 @@ class LogTransformer(BaseEstimator, TransformerMixin):
         # X = pd.DataFrame(X)  # Ensure we are working with a DataFrame
         X = X.copy()
 
-        # this was for debugging purposes --- there are some rows where c2 date is before accident date in val and test 
         # print(f"Column stats before transform:")
         # print(f"NaN values: {X[self.column].isna().sum()}")
         # print(f"Negative values: {(X[self.column] < 0).sum()}")
@@ -259,11 +279,10 @@ class LogTransformer(BaseEstimator, TransformerMixin):
         # X[f'{self.column}_log'] = np.log1p(X[self.column])
 
         # replace values with negative values with 0
-        self.zero_corrected = X[self.column].apply(lambda x: 0 if x < 0 else x)
+        X[self.column] = X[self.column].apply(lambda x: 0 if x < 0 else x)
 
         if self.handle_zeros:
-            self.zero_corrected = self.zero_corrected + self.offset  # Add offset for zeros and negatives
-            # self.zero_corrected = X[self.column] + self.offset  # Add offset for zeros and negatives      # This needs to get fixed here.
+            self.zero_corrected = X[self.column] + self.offset  # Add offset for zeros and negatives
         
         X[f'{self.column}_log'] = (
             np.log(self.zero_corrected + 1) / np.log(self.base)  # Apply log to the specified column
