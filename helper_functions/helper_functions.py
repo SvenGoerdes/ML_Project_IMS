@@ -1,6 +1,8 @@
 import pandas as pd
 from category_encoders import TargetEncoder
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 def missing_data(df):
     """
@@ -141,20 +143,31 @@ def impute_with(df: pd.DataFrame, target_column: str, group_column = None, unkno
 
     return df
 
-# write a function that takes two pandas datetime columns and returns the difference in days
-def days_between(df, start_date_col, end_date_col):
-    """
-    Calculates the difference in days between two datetime columns in a DataFrame.
 
-    Parameters:
-    - df: DataFrame containing the datetime columns.
-    - start_date_col: The column containing the start date.
-    - end_date_col: The column containing the end date.
+def handle_outliers_accident_date(X, dataset_type, lower_bound=None, column_name='Accident Date'):
+    X_copy = X.copy()
+    if dataset_type == 'train':
+        # Calculate the lower bound for accident dates in the training data
+        lower_bound = X_copy[column_name].quantile(0.01)
 
-    Returns:
-    - Series containing the difference in days between the two columns.
-    """
-    return (df[end_date_col] - df[start_date_col]).dt.days
+        # Drop rows with accident dates below the lower bound
+        X_copy = X_copy[X_copy[column_name] >= lower_bound]
+        print(f"Dropped {len(X) - len(X_copy)} rows from training data based on lower bound.")
+
+        return X_copy, lower_bound
+    
+    elif dataset_type in ['val', 'test'] and lower_bound is not None:
+        # For validation and test, cap accident dates below the precomputed lower bound
+        X_copy[column_name] = X_copy[column_name].clip(lower=lower_bound)
+        
+        # Set 'C-2 Date' to NaT where 'Accident Date' is below the lower bound
+        X_copy.loc[X_copy[column_name] < lower_bound, 'C-2 Date'] = pd.NaT
+        
+        print(f"Capped accident dates in {dataset_type} data to the lower bound: {lower_bound}.")
+        X_copy['C-2 Date']=pd.to_datetime(X_copy['C-2 Date'], errors='coerce')
+        return X_copy
+    else:
+        raise ValueError("Lower bound must be provided for validation and test datasets.")
 
 def target_encode_multiclass(X_train_df, X_val_df, y_train,  feature_col, target_col):
     """
@@ -290,38 +303,6 @@ def iqr_date(df, date_column):
 
     return lower_bound_date, upper_bound_date
 
-
-
-# NEW:
-def handle_outliers_accident_date(X, dataset_type, lower_bound=None, column_name='Accident Date'):
-    """
-    Handle accident dates by dropping (train) or capping (val/test).
-
-    Parameters:
-    - X: DataFrame to process.
-    - dataset_type: 'train', 'val', or 'test'.
-    - lower_bound: Precomputed lower bound (required for val/test).
-    - column_name: Name of the accident date column.
-
-    Returns:
-    - Transformed DataFrame and calculated lower bound (if dataset_type='train').
-    """
-    X_copy = X.copy()
-
-    if dataset_type == 'train':
-        # Calculate the lower bound for accident dates in the training data
-        lower_bound = X_copy[column_name].quantile(0.01)
-        # Drop rows with accident dates below the lower bound
-        X_copy = X_copy[X_copy[column_name] >= lower_bound]
-        print(f"Dropped {len(X) - len(X_copy)} rows from training data based on lower bound.")
-        return X_copy, lower_bound
-    elif lower_bound is not None:
-        # Cap accident dates below the precomputed lower bound
-        X_copy[column_name] = X_copy[column_name].clip(lower=lower_bound)
-        print(f"Capped accident dates in {dataset_type} data to the lower bound: {lower_bound}.")
-        return X_copy
-    else:
-        raise ValueError("Lower bound must be provided for validation and test datasets.")
 
 
 def handle_outliers_age_birth(X, dataset_type, age_column='Age at Injury', birth_year_column='Birth Year', 
@@ -503,3 +484,26 @@ def handle_outliers_with_log_iqr(train_df, val_df, test_df, column='Average Week
     train_non_zero.drop(columns=['log_' + column], inplace=True)
     
     return train_df, val_df, test_df
+
+
+def plot_accident_date_distributions_separate(datasets, labels, column_name='Accident Date'):
+    """
+    Plot the distributions of Accident Date for multiple datasets in separate subplots.
+
+    Parameters:
+    - datasets: List of DataFrames.
+    - labels: List of labels for the datasets.
+    - column_name: Name of the accident date column to plot.
+    """
+    fig, axes = plt.subplots(1, 2, figsize=(15, 6), sharey=True)
+    
+    for ax, data, label in zip(axes, datasets, labels):
+        sns.kdeplot(data[column_name], ax=ax, fill=True, alpha=0.5)
+        ax.set_title(f'{label} Distribution')
+        ax.set_xlabel('Accident Date')
+        ax.set_ylabel('Density')
+        ax.tick_params(axis='x', rotation=45)
+
+    plt.suptitle('Accident Date Distributions Before and After Processing')
+    plt.tight_layout()
+    plt.show()
