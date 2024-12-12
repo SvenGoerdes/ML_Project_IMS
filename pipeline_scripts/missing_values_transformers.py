@@ -191,8 +191,6 @@ class ImputeAccidentDate(BaseEstimator, TransformerMixin):
         
         return X_copy
 
-
-
 class ImputeAgeAtInjury(BaseEstimator, TransformerMixin):
     def __init__(self):
         """
