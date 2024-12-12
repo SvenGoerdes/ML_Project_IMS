@@ -144,30 +144,34 @@ def impute_with(df: pd.DataFrame, target_column: str, group_column = None, unkno
     return df
 
 
-def handle_outliers_accident_date(X, dataset_type, lower_bound=None, column_name='Accident Date'):
+# NEW UPDATE TO FUNCTION: TO SET C-2 TO NAN
+def handle_outliers_date(X, dataset_type, lower_bound=None, 
+                                  date_column='Accident Date', c2_column='C-2 Date'):
     X_copy = X.copy()
+
     if dataset_type == 'train':
-        # Calculate the lower bound for accident dates in the training data
-        lower_bound = X_copy[column_name].quantile(0.01)
-
+        # Calculate lower bound for training data
+        lower_bound = X_copy[date_column].quantile(0.01)
+        
         # Drop rows with accident dates below the lower bound
-        X_copy = X_copy[X_copy[column_name] >= lower_bound]
-        print(f"Dropped {len(X) - len(X_copy)} rows from training data based on lower bound.")
-
+        initial_len = len(X_copy)
+        X_copy = X_copy[X_copy[date_column] >= lower_bound]
+        print(f"Dropped {initial_len - len(X_copy)} rows from training data based on lower bound.")
+        print(f"Lower bound for accident date: {lower_bound}.")
+        
         return X_copy, lower_bound
     
-    elif dataset_type in ['val', 'test'] and lower_bound is not None:
-        # For validation and test, cap accident dates below the precomputed lower bound
-        X_copy[column_name] = X_copy[column_name].clip(lower=lower_bound)
+    elif dataset_type in ['val', 'test']:
+        if lower_bound is None:
+            raise ValueError(f"Lower bound must be provided for {dataset_type} datasets.")
         
-        # Set 'C-2 Date' to NaT where 'Accident Date' is below the lower bound
-        X_copy.loc[X_copy[column_name] < lower_bound, 'C-2 Date'] = pd.NaT
-        
-        print(f"Capped accident dates in {dataset_type} data to the lower bound: {lower_bound}.")
-        X_copy['C-2 Date']=pd.to_datetime(X_copy['C-2 Date'], errors='coerce')
+        # Set C-2 Date to NaT where Accident Date is below the lower bound
+        below_bound_mask = X_copy[date_column] < lower_bound
+        X_copy.loc[below_bound_mask, c2_column] = pd.NaT
+
+        # Cap Accident Date to the lower bound
+        X_copy[date_column] = X_copy[date_column].clip(lower=lower_bound)
         return X_copy
-    else:
-        raise ValueError("Lower bound must be provided for validation and test datasets.")
 
 def target_encode_multiclass(X_train_df, X_val_df, y_train,  feature_col, target_col):
     """
