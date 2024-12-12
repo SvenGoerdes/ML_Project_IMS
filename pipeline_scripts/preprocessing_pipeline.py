@@ -21,7 +21,7 @@ class BinaryEncoder(BaseEstimator, TransformerMixin):
             if len(unique_values) != 2:
                 raise ValueError(f"Column '{col}' does not have exactly two unique values.")
 
-            X[col] = X[col].map({unique_values[0]: 0, unique_values[1]: 1})
+            X[f'{col}_binary'] = X[col].map({unique_values[0]: 0, unique_values[1]: 1})
 
         return X
 
@@ -69,14 +69,14 @@ class Days_between(BaseEstimator, TransformerMixin):
         self.start_col = start_col
         self.end_col = end_col
 
-    def fit(self, X, y):
+    def fit(self, X, y = None):
         return self
     
     def transform(self, X):
         X = X.copy()  # Avoid modifying the original DataFrame
         X[f'Days_between_{self.end_col}_{self.start_col}'] = (X[self.end_col] - X[self.start_col]).dt.days
         return X
-    
+
 
 class DummyEncoder(BaseEstimator, TransformerMixin):
     def __init__(self, dummy_column, drop = 'first'):
@@ -89,12 +89,18 @@ class DummyEncoder(BaseEstimator, TransformerMixin):
         self.encoder.fit(X[[self.dummy_column]])
         return self
 
+
     def transform(self, X):
         X = X.copy()  # Avoid modifying the original DataFrame
         transformed_data = self.encoder.transform(X[[self.dummy_column]])
-        transformed_df = pd.DataFrame(transformed_data.toarray(), columns=self.encoder.get_feature_names_out([self.dummy_column]))
-        X = X.drop(columns=[self.dummy_column])
-        X = pd.concat([X.reset_index(drop=True), transformed_df.reset_index(drop=True)], axis=1)
+        transformed_df = pd.DataFrame(
+            transformed_data.toarray(),
+            columns=self.encoder.get_feature_names_out([self.dummy_column]),
+            index = X.index # Keep the original index
+        ) 
+
+        # Concatenate along columns without dropping the original index
+        X = pd.concat([X, transformed_df], axis=1)
         return X
 
 class ColumnMapper(BaseEstimator, TransformerMixin):
@@ -103,7 +109,7 @@ class ColumnMapper(BaseEstimator, TransformerMixin):
         self.column_name = column_name
         self.drop_original = drop_original
 
-    def fit(self, X, y=None):
+    def fit(self, X, y = None):
         return self
     
     def transform(self, X):
@@ -129,7 +135,7 @@ class NAIndicatorEncoder(BaseEstimator, TransformerMixin):
         X = X.copy()  # Avoid modifying the original DataFrame
 
         # Encode the column as 1 for not NA and 0 for NA
-        X[self.column_name] = X[self.column_name].notna().astype(int)
+        X[f'{self.column_name}_nabinary'] = X[self.column_name].notna().astype(int)
         
         return X
 
@@ -195,3 +201,73 @@ class NumberBinning(BaseEstimator, TransformerMixin):
         X = X.copy()
         X.loc[:, self.new_column_name] = pd.cut(X[self.initial_column_name], bins=self.bins, labels=self.labels)
         return X
+
+class LogTransformer(BaseEstimator, TransformerMixin):
+    """
+    A transformer class for applying a logarithmic transformation to a specified column.
+    """
+
+    def __init__(self, column, base = np.e, handle_zeros=True, offset=1.0):
+        """
+        Initialize the LogTransformer.
+        
+        Parameters:
+        - column: The column to apply the transformation to.
+        - base: The logarithmic base (default is natural log).
+        - handle_zeros: Whether to handle zeros by adding an offset (default is True).
+        - offset: The offset value to add to handle zeros and negatives (default is 1.0).
+        """
+        self.column = column
+        self.base = base
+        self.handle_zeros = handle_zeros
+        self.offset = offset
+
+    def fit(self, X, y=None):
+        """
+        Fit method for compatibility with sklearn pipeline. Does not need to do anything.
+        
+        Parameters:
+        - X: DataFrame, input data.
+        - y: Ignored, not used.
+        
+        Returns:
+        - self: Fitted transformer.
+        """
+        return self
+
+    def transform(self, X):
+        """
+        Apply the log transformation to the specified column. Drops the original column and adds the transformed column with a '_log' suffix.
+        
+        Parameters:
+        - X: DataFrame, input data.
+        
+        Returns:
+        - Transformed DataFrame with the logarithm applied to the specified column.
+        """
+        # X = pd.DataFrame(X)  # Ensure we are working with a DataFrame
+        X = X.copy()
+
+        # this was for debugging purposes --- there are some rows where c2 date is before accident date in val and test 
+        # print(f"Column stats before transform:")
+        # print(f"NaN values: {X[self.column].isna().sum()}")
+        # print(f"Negative values: {(X[self.column] < 0).sum()}")
+        # print(f"Zero values: {(X[self.column] == 0).sum()}")
+        # print(f"Min value: {X[self.column].min()}")
+        
+
+        # X[f'{self.column}_log'] = np.log1p(X[self.column])
+
+        # replace values with negative values with 0
+        self.zero_corrected = X[self.column].apply(lambda x: 0 if x < 0 else x)
+
+        if self.handle_zeros:
+            self.zero_corrected = self.zero_corrected + self.offset  # Add offset for zeros and negatives
+            # self.zero_corrected = X[self.column] + self.offset  # Add offset for zeros and negatives      # This needs to get fixed here.
+        
+        X[f'{self.column}_log'] = (
+            np.log(self.zero_corrected + 1) / np.log(self.base)  # Apply log to the specified column
+        )
+        
+        return X
+
