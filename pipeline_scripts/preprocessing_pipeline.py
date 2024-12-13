@@ -21,7 +21,7 @@ class BinaryEncoder(BaseEstimator, TransformerMixin):
             if len(unique_values) != 2:
                 raise ValueError(f"Column '{col}' does not have exactly two unique values.")
 
-            X[f'{col}_binary'] = X[col].map({unique_values[0]: 0, unique_values[1]: 1})
+            X[f'{col}_binary'] = X[col].map({unique_values[0]: 0, unique_values[1]: 1}).astype(int)
 
         return X
 
