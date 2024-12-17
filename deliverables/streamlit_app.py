@@ -123,3 +123,4 @@ if st.button("Predict"):
 
     st.write("Prediction placeholder:")
     st.write("Please implement your prediction logic here.")
+    st.write("Disclaimer: ")
