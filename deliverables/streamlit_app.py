@@ -68,10 +68,29 @@ user_inputs = {}
 
 for col, dtype in columns_info:
     if col in date_columns:
-        # Date columns: Use text input for manual entry in YYYY-MM-DD format
-        date_input = st.text_input(f"{col} format: (YYYY-MM-DD)", value=pd.Timestamp.now().strftime("%Y-%m-%d"))
-        if date_input.strip().lower() == "unknown" or date_input.strip() == "":
+
+        # provide a checkbox for unknown date
+        unknown_selected = st.checkbox(f"Unknown {col}?", value=False)
+
+        if unknown_selected:
             user_inputs[col] = np.nan
+        else:    
+            # Date columns: Use text input for manual entry in YYYY-MM-DD format
+            date_input = st.text_input(f"{col} format: (YYYY-MM-DD)", value=pd.Timestamp.now().strftime("%Y-%m-%d"))
+            # Validate the date format
+            try:
+                user_inputs[col] = pd.to_datetime(date_input).date()
+            except ValueError:
+                st.error(f"Invalid date format for {col}. Please use YYYY-MM-DD.")
+                user_inputs[col] = np.nan
+
+            
+            user_inputs[col] = pd.to_datetime(date_input).date()
+            # check if date is in the future
+            if user_inputs[col] > pd.Timestamp.now().date():
+                st.error(f"Invalid date for {col}. Please use a past date.")
+                user_inputs[col] = np.nan
+                
     elif dtype == "object":
         # Object column
         unique_values = unique_value_dict[col]
