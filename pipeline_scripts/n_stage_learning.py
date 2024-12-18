@@ -90,9 +90,6 @@ def model_split(binary_list: list, all_features: list):
             if feature in iteration_features:
 
                 iteration_features.remove(feature)
-                print(f' Removed {feature} from the list of features')
-
-                print(f' The remaining features are: {iteration_features}')
 
         # append the tuple of binary_target and remaining features
         i_iteration_binary_train = (binary_target, iteration_features.copy())
@@ -205,10 +202,10 @@ def n_stage_learning_model(model_iteration_list, X_train, y_train, X_val, y_val,
     return model_dict
 
 # we use downsampling here to balance the data for a minority class 
-def balanced_bagging(X, y , rel_size_bagg_min, minority_class, num_bags = 3):
+def balanced_bagging(X, y , target_column, rel_size_bagg_min, minority_class, num_bags = 3):
     """
     The funciton takes a df and returns n number of balanced bagging dataframes with the size of
-    rel_size_bagg * minority_sample
+    rel_size_bagg * minority_sample. It expects a binary target column 
 
     Args:
         X: dataframe with the features
@@ -223,8 +220,8 @@ def balanced_bagging(X, y , rel_size_bagg_min, minority_class, num_bags = 3):
 
     df_list = []
     # get the minority class
-    minority_df = X[y == minority_class].reset_index()
-    majority_df = X[y != minority_class].reset_index()
+    minority_df = X[y[target_column] == minority_class].reset_index()
+    majority_df = X[y[target_column] != minority_class].reset_index()
 
 
     # get the size of the minority class
@@ -281,3 +278,89 @@ def model_evaluation(model, X_val, y_val):
     report = classification_report(y_val, y_pred)
     
     return accuracy, precision, recall, f1, report
+
+
+
+# This model returns us predicitons for our N-stage model
+
+def n_stage_pred(split_model_dict, split_list, X_input: pd.DataFrame):
+    """
+
+    Predicts using a dictionary of models for a multi-stage prediction pipeline. 
+
+    Each model corresponds to a specific split defined in the `split_list`. At each stage, the function uses the 
+    corresponding model to make predictions, and based on the prediction results, filters the dataset for subsequent stages.
+
+    Args:
+        model_dict (dict): Dictionary of models, where keys correspond to split names and values are the trained models.
+        split_list (list): List of split names corresponding to target values (e.g., '2 Non Comp').
+        X_input (pd.DataFrame): Input feature dataframe for predictions.
+        
+        # y_input (pd.DataFrame): True target values (optional, for future use).
+
+    Returns:
+        pd.DataFrame: A DataFrame containing predictions for each input row.
+
+    """
+
+    iteration_df = X_input.copy()
+
+    # create a dataframe with one column that contains a string. The dataframe is the same length as the input dataframe and contains the same index
+    y_pred = pd.DataFrame(index = X_input.index)
+    # new column with prediction placeholdr. This will be replaced with the actual prediction for each index value 
+    y_pred['N_stage_pred'] = 'pred_placeholder'
+    
+
+    # binary mode split is a bity confusing but it contains actually values like '2 Non Comp' which also is used as key for the dict.
+    for binary_model_split in split_list:
+
+        if binary_model_split not in split_model_dict:
+            raise ValueError(f"Model for split '{binary_model_split}' not found in split_model_dict.")
+
+        # can replace this with a function that takes treshold into account. E.g. XGBoost prob_pred
+        pred = split_model_dict[binary_model_split].predict(iteration_df)
+
+        # check where prediction is 1 
+        pred_index_one = iteration_df[pred == 1 ].index
+        # check where prediction is 0
+        pred_index_zero = iteration_df[pred == 0 ].index
+
+        # set values to the String e.g. "2. Non Comp" where the current model predicted 1
+        y_pred.loc[pred_index_one, 'N_stage_pred'] = binary_model_split
+
+
+        # Safe the index of the iteration_df
+        # index = X_input.iteration_df
+
+        # New dataframe for next model prediction where predictions are 0 
+        iteration_df = iteration_df.loc[pred_index_zero].copy()
+
+
+    return y_pred
+
+
+def n_stage_pred_rest(split_model_dict, split_list, X_input: pd.DataFrame, rest_model, label_dict):
+
+    y_pred = n_stage_pred(split_model_dict, split_list, X_input)
+
+    # check where model has not predicted yet 
+    pred_index_rest = y_pred[y_pred['N_stage_pred'] == 'pred_placeholder'].index
+
+    iteration_df = X_input.loc[pred_index_rest].copy()
+
+    # predict the rest of the values with the rest model
+    pred = rest_model.predict(iteration_df)
+
+    # define as pd.series
+    pred = pd.Series(pred, index = iteration_df.index)
+
+    # translate the predictions with the label_dict
+    pred = pred.map(label_dict)
+
+
+    # set the values to the last predictions 
+    y_pred.loc[pred_index_rest, 'N_stage_pred'] = pred 
+
+
+    return y_pred
+        
