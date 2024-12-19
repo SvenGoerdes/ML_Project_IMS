@@ -417,7 +417,7 @@ class ImputeUsingModeAfterGroupingColumn(BaseEstimator, TransformerMixin):
                 if grouping_value in self.modes:
                     X_copy.at[i, imputed_column_name] = self.modes[grouping_value]
         
-        return X_copy
+        return X_copy 
 
 
 # class ImputeC2Date(BaseEstimator, TransformerMixin):
