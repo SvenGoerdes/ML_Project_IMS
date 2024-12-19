@@ -33,15 +33,18 @@ def fp_tn_distribution(prediction, true_values, minority_class_col = 'minority_c
         # get the false positives and true negatives rows 
         false_positives = true_values['Claim Injury Type'][(true_values[minority_class_col] == 0) & (prediction == 1)] 
         true_negative = true_values['Claim Injury Type'][(true_values[minority_class_col] == 0) & (prediction == 0)] 
+        false_negatives = true_values['Claim Injury Type'][(true_values[minority_class_col] == 1) & (prediction == 0)]
 
         # labels 
         labels = true_values['Claim Injury Type'].unique()
         # divide the value counts 
         true_values_negative = true_values['Claim Injury Type'][(true_values[minority_class_col] == 0)].value_counts()
+        true_values_positive = true_values['Claim Injury Type'][(true_values[minority_class_col] == 1)].value_counts()
         
         # count values for every  for the false positives and true negatives
         value_count_fp = false_positives.value_counts().astype(float)
         value_count_tn = true_negative.value_counts().astype(float)
+        value_count_fn = false_negatives.value_counts().astype(float)
 
 
         # if a value is missing in the false positives or true negatives add it with a value of 0
@@ -50,6 +53,8 @@ def fp_tn_distribution(prediction, true_values, minority_class_col = 'minority_c
                 value_count_fp[value] = 0
             if value not in value_count_tn.index:
                 value_count_tn[value] = 0
+            if value not in value_count_fn.index:
+                value_count_fn[value] = 0
 
 
         # divide the value counts by the total value counts
@@ -57,15 +62,20 @@ def fp_tn_distribution(prediction, true_values, minority_class_col = 'minority_c
             value_count_fp[value] = value_count_fp[value] / true_values_negative[value]
             value_count_tn[value] = value_count_tn[value] / true_values_negative[value]
         
+        for value in true_values_positive.index:
+            value_count_fn[value] = value_count_fn[value] / true_values_positive[value]
+        
 
     else:
         false_positives = true_values['Claim Injury Type'][(true_values[minority_class_col] == 0) & (prediction == 1)] 
         true_negative = true_values['Claim Injury Type'][(true_values[minority_class_col] == 0) & (prediction == 0)] 
+        false_negative = true_values['Claim Injury Type'][(true_values[minority_class_col] == 1) & (prediction == 0)] 
         value_count_fp = false_positives.value_counts()
         value_count_tn = true_negative.value_counts()
+        value_count_fn = false_negative.value_counts()
 
 
-    return value_count_fp, value_count_tn
+    return value_count_fp, value_count_tn, value_count_fn
 
 def model_split(binary_list: list, all_features: list):
     """
@@ -125,7 +135,22 @@ def binary_splitting(df: pd.DataFrame, minority_class_list: list, split_col):
     
     return binary_array
 
-def filter_features(y_train, binary_target, rest_binary_target):
+def filter_target(y_train, binary_target, rest_binary_target):
+        """
+        Define a function that takes a dataframe and returns a dataframe with the rows that contain the binary_target and rest_binary_target values
+        and a column that defines the binary_target values with 0 and 1
+
+        Args:
+            y_train: target dataframe
+            binary_target: list of binary target values e.g. ['2 Non Comp']
+            rest_binary_target: list of rest binary target values e.g. ['3. MED ONLY' , '4. TEMPORARY'] 
+
+        Returns:
+            y_train_filtered: dataframe with the rows that contain the binary_target and rest_binary_target values
+            and a column that defines the binary_target values with 0 and 1
+        
+        """
+
 
         # filter the features | get all the rows where y_val contains the rest_binary_target values
         y_train_filtered = y_train[y_train['Claim Injury Type'].isin(rest_binary_target + binary_target)].copy()
@@ -175,20 +200,20 @@ def n_stage_learning_model(model_iteration_list, X_train, y_train, X_val, y_val,
     for binary_target, rest_binary_target in model_iteration_list:
         
         # create model instance inside the dictionary
-        model_dict[str(binary_target) + '_model_node_' + str(iter)] = model_classes[model](**kwargs)
+        model_dict[binary_target[0]] = model_classes[model](**kwargs)
 
 
         # this gives back a dataframe with rows only containing values of the binary_target and rest_binary_target
         # and a column that defines the binary_target values with 0 and 1
-        y_train_filtered = filter_features(y_train, binary_target, rest_binary_target)
+        y_train_filtered = filter_target(y_train, binary_target, rest_binary_target)
 
         X_train_filtered = X_train.loc[y_train_filtered.index]
 
         # train the model of the node with the filtered features and target values inside the dictionary
-        model_dict[str(binary_target) + '_model_node_' + str(iter)].fit(X_train_filtered, y_train_filtered['binary_target'])
+        model_dict[binary_target[0]].fit(X_train_filtered, y_train_filtered['binary_target'])
 
         # predict the target
-        y_pred = model_dict[str(binary_target) + '_model_node_' + str(iter)].predict(X_val)
+        # y_pred = model_dict[binary_target[0]].predict(X_val)
         
         print(f"{iter}/ {model_count} Iteration")
         # keep track of the node
@@ -283,7 +308,7 @@ def model_evaluation(model, X_val, y_val):
 
 # This model returns us predicitons for our N-stage model
 
-def n_stage_pred(split_model_dict, split_list, X_input: pd.DataFrame):
+def n_stage_pred(split_model_dict, split_list, X_input: pd.DataFrame, treshold_predict = False, treshold_value = [0.5]):
     """
 
     Predicts using a dictionary of models for a multi-stage prediction pipeline. 
@@ -310,16 +335,32 @@ def n_stage_pred(split_model_dict, split_list, X_input: pd.DataFrame):
     # new column with prediction placeholdr. This will be replaced with the actual prediction for each index value 
     y_pred['N_stage_pred'] = 'pred_placeholder'
     
-
+    # iterate through the treshold_value list
+    treshold_index = 0
     # binary mode split is a bity confusing but it contains actually values like '2 Non Comp' which also is used as key for the dict.
     for binary_model_split in split_list:
 
         if binary_model_split not in split_model_dict:
             raise ValueError(f"Model for split '{binary_model_split}' not found in split_model_dict.")
+        
+        if treshold_predict:
+            
+            if len(treshold_value) == 1:
+                pred = split_model_dict[binary_model_split].predict_proba(iteration_df)[:, 1]
+                pred = (pred > treshold_value[0]).astype(int)
+            else:
+                
+                # predict with each value for the treshold
+                pred = split_model_dict[binary_model_split].predict_proba(iteration_df)[:, 1]
+                pred = (pred > treshold_value[treshold_index]).astype(int)
 
+        else:
         # can replace this with a function that takes treshold into account. E.g. XGBoost prob_pred
-        pred = split_model_dict[binary_model_split].predict(iteration_df)
+            pred = split_model_dict[binary_model_split].predict(iteration_df)
 
+        # increase the treshold index to get the next treshold value in next iteration
+        treshold_index += 1
+        
         # check where prediction is 1 
         pred_index_one = iteration_df[pred == 1 ].index
         # check where prediction is 0
@@ -339,9 +380,9 @@ def n_stage_pred(split_model_dict, split_list, X_input: pd.DataFrame):
     return y_pred
 
 
-def n_stage_pred_rest(split_model_dict, split_list, X_input: pd.DataFrame, rest_model, label_dict):
+def n_stage_pred_rest(split_model_dict, split_list, X_input: pd.DataFrame, rest_model, label_dict, treshold_predict = False, treshold_value = [0.5]):
 
-    y_pred = n_stage_pred(split_model_dict, split_list, X_input)
+    y_pred = n_stage_pred(split_model_dict, split_list, X_input, treshold_predict = treshold_predict, treshold_value = treshold_value)
 
     # check where model has not predicted yet 
     pred_index_rest = y_pred[y_pred['N_stage_pred'] == 'pred_placeholder'].index
@@ -363,4 +404,26 @@ def n_stage_pred_rest(split_model_dict, split_list, X_input: pd.DataFrame, rest_
 
 
     return y_pred
-        
+
+
+# this functions shows in each step how many of the target values we keep and how many we lose
+# def value_loss_keep()
+    # for target_split in model_split_list:
+    #     print(f"for {target_split[0][0]} we are losing/winning the folliwng values in this iteration")
+
+    # (model_dict['2. NON-COMP'].predict_proba(X_val_encoded)[:,1] > 1).astype(int)
+
+    # min_class_list = ['2. NON-COMP']
+    # y_val['minority_class_node_1'] = binary_splitting(y_val, min_class_list, 'Claim Injury Type')
+    # # get predictions for the first node
+    # predictions_node_1 = model_dict['2. NON-COMP'].predict(X_val_encoded)
+    # # get confusion_matrix
+    # print('no treshold given')
+    # print(confusion_matrix(y_val['minority_class_node_1'].values, predictions_node_1))
+
+    # predictions_node_1_tresh =  (model_dict['2. NON-COMP'].predict_proba(X_val_encoded)[:,1] > 0.85).astype(int)
+
+    # print('treshold given')
+    # print(confusion_matrix(y_val['minority_class_node_1'].values, predictions_node_1_tresh))
+
+    # plot = sns.heatmap(confusion_matrix(y_val['minority_class_node_1'].values, predictions_node_1_tresh), annot=True, fmt='d', cmap='Blues')
