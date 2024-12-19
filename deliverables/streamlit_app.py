@@ -8,6 +8,15 @@ import numpy as np
 st.title("Prediction Interface")
 st.write("Please select values for each feature to get an instant prediction.")
 
+# Define the columns and data type info
+personal_info_cols = ['Gender', 'Number of Dependents']
+incident_details_cols = ['Age at Injury', 'Accident Date', 'Assembly Date', 'C-2 Date', 'C-3 Date', 'First Hearing Date', 
+                         'IME-4 Count', 'COVID-19 Indicator', 'County of Injury', 'WCIO Cause of Injury Description', 
+                         'WCIO Nature of Injury Description', 'WCIO Part Of Body Description', 'Medical Fee Region', 
+                         'District Name', 'Alternative Dispute Resolution']
+industry_employment_cols = ['Industry Code Description', 'Carrier Type', 'Attorney/Representative', 'Average Weekly Wage']
+
+
 # Identify date columns (currently stored as object but represent dates)
 date_columns = [
     "Accident Date",
@@ -64,72 +73,66 @@ unique_value_dict = {'Alternative Dispute Resolution': ['N', 'Y', 'U'],
  'WCIO Part Of Body Description': ['BUTTOCKS', 'SHOULDER(S)', 'MULTIPLE HEAD INJURY', 'FINGER(S)', 'LUNGS', 'EYE(S)', 'ANKLE', 'KNEE', 'THUMB', 'LOWER BACK AREA', 'ABDOMEN INCLUDING GROIN', 'LOWER LEG', 'HIP', 'UPPER LEG', 'MOUTH', 'WRIST', 'SPINAL CORD', 'HAND', 'SOFT TISSUE', 'UPPER ARM', 'FOOT', 'ELBOW', 'MULTIPLE UPPER EXTREMITIES', 'MULTIPLE BODY PARTS (INCLUDING BODY', 'BODY SYSTEMS AND MULTIPLE BODY SYSTEMS', 'MULTIPLE NECK INJURY', 'CHEST', 'WRIST (S) & HAND(S)', 'EAR(S)', 'MULTIPLE LOWER EXTREMITIES', 'DISC', 'LOWER ARM', 'MULTIPLE', 'UPPER BACK AREA', 'SKULL', 'TOES', 'FACIAL BONES', 'TEETH', 'NO PHYSICAL INJURY', 'MULTIPLE TRUNK', 'WHOLE BODY', 'INSUFFICIENT INFO TO PROPERLY IDENTIFY - UNCLASSIFIED', 'PELVIS', 'NOSE', 'GREAT TOE', 'INTERNAL ORGANS', 'HEART', 'VERTEBRAE', 'LUMBAR & OR SACRAL VERTEBRAE (VERTEBRA', 'BRAIN', 'SACRUM AND COCCYX', 'ARTIFICIAL APPLIANCE', 'LARYNX', 'TRACHEA'],
  'Number of Dependents': ['1.0', '4.0', '6.0', '5.0', '3.0', '2.0', '0.0']}
 
-user_inputs = {}
-
-for col, dtype in columns_info:
+# Function to handle user inputs based on column type
+def handle_column_input(col, dtype, unique_value_dict):
+    user_input = None
     if col in date_columns:
-
-        # provide a checkbox for unknown date
+        # Date columns: Provide a checkbox for "Unknown" date and validate input
         unknown_selected = st.checkbox(f"Unknown {col}?", value=False)
-
         if unknown_selected:
-            user_inputs[col] = np.nan
-        else:    
-            # Date columns: Use text input for manual entry in YYYY-MM-DD format
+            user_input = np.nan
+        else:
             date_input = st.text_input(f"{col} format: (YYYY-MM-DD)", value=pd.Timestamp.now().strftime("%Y-%m-%d"))
-            # Validate the date format
             try:
-                user_inputs[col] = pd.to_datetime(date_input).date()
+                user_input = pd.to_datetime(date_input).date()
+                if user_input > pd.Timestamp.now().date():
+                    st.error(f"Invalid date for {col}. Please use a past date.")
+                    user_input = np.nan
             except ValueError:
                 st.error(f"Invalid date format for {col}. Please use YYYY-MM-DD.")
-                user_inputs[col] = np.nan
-
-            
-            user_inputs[col] = pd.to_datetime(date_input).date()
-            # check if date is in the future
-            if user_inputs[col] > pd.Timestamp.now().date():
-                st.error(f"Invalid date for {col}. Please use a past date.")
-                user_inputs[col] = np.nan
-                
+                user_input = np.nan
     elif dtype == "object":
-        # Object column
-        unique_values = unique_value_dict[col]
-        unique_values = list(unique_values)
-        # Add "Unknown" option at the beginning
+        # Object columns: Selectbox with unique values + "Unknown"
+        unique_values = unique_value_dict.get(col, [])
         unique_values = ["Unknown"] + unique_values
         selected = st.selectbox(f"{col}", unique_values)
-        if selected == "Unknown":
-            user_inputs[col] = np.nan
-        else:
-            user_inputs[col] = selected
+        user_input = np.nan if selected == "Unknown" else selected
     else:
-        # Numeric column
-        # Identify which ones should be int
-        if col == "Age at Injury":
-            # Integer input
-            # valid_values = data[col].dropna()
-            default_val = 30
-            user_inputs[col] = int(st.number_input(
-                label=f"{col}",
-                value=default_val,
-                step=1
-            ))
-        elif col == "IME=4 Count":
-            default_val = 0
-            user_inputs[col] = int(st.number_input(
-                label=f"{col}",
-                value=default_val,
-                step=1
-            ))
+        # Numeric columns: Handle int and float types
+        if col == "Age at Injury" or col == "IME-4 Count":
+            default_val = 30 if col == "Age at Injury" else 0
+            user_input = int(st.number_input(f"{col}", value=default_val, step=1))
         else:
-            # Other numeric columns remain float
-            # valid_values = data[col].dropna()
             default_val = 1
-            user_inputs[col] = int(st.number_input(
-                label=f"{col}",
-                value=default_val,
-                step=1
-            ))
+            user_input = float(st.number_input(f"{col}", value=default_val, step=1))
+    return user_input
+
+
+# Set up the tabs for each section
+tabs = st.tabs(["Personal Information", "Incident Details", "Industry and Employment"])
+
+# Initialize dictionary to store user inputs
+user_inputs = {}
+
+# Process inputs for Personal Information
+with tabs[0]:  # Personal Information
+    for col in personal_info_cols:
+        dtype = "object" if col in ['Gender'] else "numeric"  # Set dtype based on the column
+        user_inputs[col] = handle_column_input(col, dtype, unique_value_dict)
+
+# Process inputs for Incident Details
+with tabs[1]:  # Incident Details
+    for col in incident_details_cols:
+        dtype = "date" if "Date" in col else "object" if col in unique_value_dict else "numeric"
+        user_inputs[col] = handle_column_input(col, dtype, unique_value_dict)
+
+# Process inputs for Industry and Employment
+with tabs[2]:  # Industry and Employment
+    for col in industry_employment_cols:
+        dtype = "object" if col in unique_value_dict else "numeric"
+        user_inputs[col] = handle_column_input(col, dtype, unique_value_dict)
+
+
 
 if st.button("Predict"):
     # Here you can integrate your model prediction
