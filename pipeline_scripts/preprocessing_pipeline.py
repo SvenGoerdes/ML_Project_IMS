@@ -303,3 +303,52 @@ class LogTransformer(BaseEstimator, TransformerMixin):
         
         return X
 
+class frequencyEncoder(BaseEstimator, TransformerMixin):
+    def __init__(self, column_name):
+        self.column_name = column_name
+        self.frequency_map = {}
+
+    def fit(self, X, y=None):
+        self.frequency_map = X[self.column_name].value_counts().to_dict()
+        return self
+
+    def transform(self, X):
+        X = X.copy()
+        X[f'{self.column_name}_freq'] = X[self.column_name].map(self.frequency_map).fillna(0)
+        return X
+    
+
+class DateTimeFeatureExtractor(BaseEstimator, TransformerMixin):
+    """
+    A custom transformer to extract day of the week, month, and year 
+    from a datetime column in a pandas DataFrame.
+
+    Args:
+        date_column (str): The name of the datetime column in the input DataFrame.
+
+    Returns:
+        A pandas DataFrame with extracted features.
+
+
+    """
+    def __init__(self, date_column: str):
+        self.date_column = date_column
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+
+        X = X.copy()
+        if self.date_column not in X.columns:
+            raise KeyError(f"The specified column '{self.date_column}' is not in the DataFrame.")
+
+        # Ensure the column is of datetime type
+        X[self.date_column] = pd.to_datetime(X[self.date_column], errors='coerce')
+
+        # Extract features
+        X[f'{self.date_column}_day_of_week'] = X[self.date_column].dt.dayofweek  # Monday=0, Sunday=6
+        X[f'{self.date_column}month'] = X[self.date_column].dt.month            # January=1, December=12
+        X[f'{self.date_column}year'] = X[self.date_column].dt.year
+
+        return X
