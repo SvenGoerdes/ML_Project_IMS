@@ -2,10 +2,6 @@
 from sklearn.base import BaseEstimator, TransformerMixin
 import pandas as pd
 import numpy as np
-from sklearn.base import BaseEstimator, TransformerMixin
-
-from sklearn.base import BaseEstimator, TransformerMixin
-
 import numpy as np
 
 
@@ -67,6 +63,38 @@ class ImputeBirthYearWithMedian(BaseEstimator, TransformerMixin):
 
 
 
+# class ImputeProportionalTransformer(BaseEstimator, TransformerMixin):
+#     def __init__(self, column):
+#         """
+#         Custom transformer for proportional imputation of missing values.
+        
+#         Args:
+#             column (str): The column to impute.
+#         """
+#         self.column = column
+
+#     def fit(self, X, y=None):
+#         # Calculate the proportions of the values in the column
+#         prop = X[self.column].value_counts(normalize=True)
+#         self.categories = prop.index.tolist()
+#         self.proportions = prop.values
+#         return self
+
+#     def transform(self, X):
+#         X_copy = X.copy()
+        
+#         # Find the indices of missing values in the specified column
+#         missing_indices = X_copy[self.column].isna()
+        
+#         # Generate imputed values based on the calculated proportions from before
+#         imputed_values = np.random.choice(self.categories, size=missing_indices.sum(), p=self.proportions)
+        
+#         # Fill in the missing values with the imputed values
+#         X_copy.loc[missing_indices, self.column] = imputed_values
+        
+#         return X_copy
+    
+
 class ImputeProportionalTransformer(BaseEstimator, TransformerMixin):
     def __init__(self, column):
         """
@@ -78,6 +106,9 @@ class ImputeProportionalTransformer(BaseEstimator, TransformerMixin):
         self.column = column
 
     def fit(self, X, y=None):
+        """
+        Calculates the proportions of the values in the specified column.
+        """
         # Calculate the proportions of the values in the column
         prop = X[self.column].value_counts(normalize=True)
         self.categories = prop.index.tolist()
@@ -85,6 +116,9 @@ class ImputeProportionalTransformer(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X):
+        """
+        Creates a new column with imputed values for the missing entries.
+        """
         X_copy = X.copy()
         
         # Find the indices of missing values in the specified column
@@ -93,11 +127,14 @@ class ImputeProportionalTransformer(BaseEstimator, TransformerMixin):
         # Generate imputed values based on the calculated proportions from before
         imputed_values = np.random.choice(self.categories, size=missing_indices.sum(), p=self.proportions)
         
-        # Fill in the missing values with the imputed values
-        X_copy.loc[missing_indices, self.column] = imputed_values
+        # Create a new column with the name '<column> + imputed' and copy the original values
+        imputed_column_name = f"{self.column} Imputed"
+        X_copy[imputed_column_name] = X_copy[self.column]
+        
+        # Fill in the missing values in the new column with the imputed values
+        X_copy.loc[missing_indices, imputed_column_name] = imputed_values
         
         return X_copy
-    
 
 
 
@@ -218,6 +255,29 @@ class ImputeAgeAtInjury(BaseEstimator, TransformerMixin):
 
 
 
+# class FillNaNValues(BaseEstimator, TransformerMixin):
+#     def __init__(self, column, fill_value):
+#         """
+#         Custom transformer to fill missing values in the specified column.
+        
+#         Args:
+#             column (str): The column name to fill missing values in.
+#             fill_value: The value to replace missing values with.
+#         """
+#         self.column = column
+#         self.fill_value = fill_value
+
+#     def fit(self, X, y=None):
+#         # No fitting required for simple constant filling
+#         return self
+
+#     def transform(self, X):
+#         X_copy = X.copy()
+#         # Fill missing values in the specified column
+#         X_copy[self.column] = X_copy[self.column].fillna(self.fill_value)
+#         return X_copy
+    
+
 class FillNaNValues(BaseEstimator, TransformerMixin):
     def __init__(self, column, fill_value):
         """
@@ -236,12 +296,18 @@ class FillNaNValues(BaseEstimator, TransformerMixin):
 
     def transform(self, X):
         X_copy = X.copy()
-        # Fill missing values in the specified column
-        X_copy[self.column] = X_copy[self.column].fillna(self.fill_value)
+        
+        # Create a new column with the name '<column> + filled'
+        filled_column_name = f"{self.column} Imputed"
+        X_copy[filled_column_name] = X_copy[self.column]
+        
+        # Fill missing values in the new column
+        X_copy[filled_column_name] = X_copy[filled_column_name].fillna(self.fill_value)
+        
         return X_copy
-    
 
-from sklearn.base import BaseEstimator, TransformerMixin
+
+
 
 class ImputeWithUnknownWCIO(BaseEstimator, TransformerMixin):
     def __init__(self, columns_code, columns_desc, default_code=100, default_desc="Unknown"):
@@ -306,6 +372,26 @@ class FillMissingDescriptionsWithMapping(BaseEstimator, TransformerMixin):
         
         return X_copy
 
+# class ImputeUsingModeAfterGrouping(BaseEstimator, TransformerMixin):
+#     def __init__(self, grouping_column, column_to_impute):
+#         self.grouping_column = grouping_column  # The column to use for grouping
+#         self.column_to_impute = column_to_impute  # The column to impute
+
+#     def fit(self, X, y=None):
+#         # Calculate the most frequent (mode) value of the column_to_impute based on the grouping_column
+#         self.modes = X.groupby(self.grouping_column)[self.column_to_impute].apply(lambda x: x.mode()[0])
+#         return self
+
+#     def transform(self, X):
+#         X_copy = X.copy()
+#         for i, row in X_copy.iterrows():
+#             if pd.isna(row[self.column_to_impute]):  # If the column_to_impute is NaN
+#                 grouping_value = row[self.grouping_column]
+#                 # Fill the missing column_to_impute with the mode of the corresponding group
+#                 if grouping_value in self.modes:
+#                     X_copy.at[i, self.column_to_impute] = self.modes[grouping_value]
+#         return X_copy
+
 class ImputeUsingModeAfterGrouping(BaseEstimator, TransformerMixin):
     def __init__(self, grouping_column, column_to_impute):
         self.grouping_column = grouping_column  # The column to use for grouping
@@ -318,13 +404,50 @@ class ImputeUsingModeAfterGrouping(BaseEstimator, TransformerMixin):
 
     def transform(self, X):
         X_copy = X.copy()
+        
+        # Create a new column with the name '<column_to_impute> + imputed'
+        imputed_column_name = f"{self.column_to_impute} Imputed"
+        X_copy[imputed_column_name] = X_copy[self.column_to_impute]
+        
+        # Impute missing values
         for i, row in X_copy.iterrows():
             if pd.isna(row[self.column_to_impute]):  # If the column_to_impute is NaN
                 grouping_value = row[self.grouping_column]
                 # Fill the missing column_to_impute with the mode of the corresponding group
                 if grouping_value in self.modes:
-                    X_copy.at[i, self.column_to_impute] = self.modes[grouping_value]
+                    X_copy.at[i, imputed_column_name] = self.modes[grouping_value]
+        
         return X_copy
+
+
+# class ImputeC2Date(BaseEstimator, TransformerMixin):
+#     def __init__(self):
+#         self.avg_diff = None
+
+#     def fit(self, X, y=None):
+#         X = X.copy()
+#         X['C-2 Date'] = pd.to_datetime(X['C-2 Date'], errors='coerce')
+#         X['Accident Date'] = pd.to_datetime(X['Accident Date'], errors='coerce')
+
+#         # Calculate the difference between 'Accident Date' and 'C-2 Date' for non-null C-2 Dates
+#         difference_between_accident_c2 = (X['C-2 Date'] - X['Accident Date']).dropna()
+        
+#         # Compute the average difference
+#         self.avg_diff = difference_between_accident_c2.mean()
+#         return self
+
+#     def transform(self, X):
+#         X = X.copy()
+#         X['C-2 Date'] = pd.to_datetime(X['C-2 Date'], errors='coerce')
+#         X['Accident Date'] = pd.to_datetime(X['Accident Date'], errors='coerce')
+        
+#         # Impute only missing 'C-2 Date' using Accident date + average difference
+#         X.loc[X['C-2 Date'].isna(), 'C-2 Date'] = X['Accident Date'] + self.avg_diff
+#         X['C-2 Date'] = pd.to_datetime(X['C-2 Date'])
+        
+#         return X
+    
+
 
 class ImputeC2Date(BaseEstimator, TransformerMixin):
     def __init__(self):
@@ -347,8 +470,13 @@ class ImputeC2Date(BaseEstimator, TransformerMixin):
         X['C-2 Date'] = pd.to_datetime(X['C-2 Date'], errors='coerce')
         X['Accident Date'] = pd.to_datetime(X['Accident Date'], errors='coerce')
         
+        # Create a new column name for imputed 'C-2 Date'
+        imputed_column_name = 'C-2 Date + imputed'
+        
+        # Copy 'C-2 Date' to the new column
+        X[imputed_column_name] = X['C-2 Date']
+        
         # Impute only missing 'C-2 Date' using Accident date + average difference
-        X.loc[X['C-2 Date'].isna(), 'C-2 Date'] = X['Accident Date'] + self.avg_diff
-        X['C-2 Date'] = pd.to_datetime(X['C-2 Date'])
+        X.loc[X['C-2 Date'].isna(), imputed_column_name] = X['Accident Date'] + self.avg_diff
         
         return X
