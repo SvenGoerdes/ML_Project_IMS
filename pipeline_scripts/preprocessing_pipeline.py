@@ -123,10 +123,20 @@ class ColumnMapper(BaseEstimator, TransformerMixin):
 
         return X
     
-
 class NAIndicatorEncoder(BaseEstimator, TransformerMixin):
-    def __init__(self, column_name):
+    """
+    A transformer class for encoding missing values in a column as binary indicators.
+
+    Parameters:
+    - column_name: The name of the column to encode.
+    - include_zero: Whether to include zero values in the encoding (default is False).
+
+    Returns:
+    - Dataframe with a new column indicating missing values in the specified column with 0 or 1.
+    """
+    def __init__(self, column_name, include_zero = False):
         self.column_name = column_name
+        self.include_zero = include_zero
 
     def fit(self, X, y=None):
         return self
@@ -134,8 +144,11 @@ class NAIndicatorEncoder(BaseEstimator, TransformerMixin):
     def transform(self, X):
         X = X.copy()  # Avoid modifying the original DataFrame
 
+        if self.include_zero:
+            X[f'{self.column_name}_nabinary'] = ((X[self.column_name].isna()) | (X[self.column_name] == 0)).astype(int)
         # Encode the column as 1 for not NA and 0 for NA
-        X[f'{self.column_name}_nabinary'] = X[self.column_name].notna().astype(int)
+        else:
+            X[f'{self.column_name}_nabinary'] = X[self.column_name].isna().astype(int)
         
         return X
     
