@@ -144,8 +144,7 @@ def impute_with(df: pd.DataFrame, target_column: str, group_column = None, unkno
     return df
 
 
-# NEW UPDATE TO FUNCTION: TO SET C-2 TO NAN
-def handle_outliers_date(X, dataset_type, lower_bound=None, 
+def handle_outliers_accident_date(X, dataset_type, lower_bound=None, 
                                   date_column='Accident Date', c2_column='C-2 Date'):
     X_copy = X.copy()
 
