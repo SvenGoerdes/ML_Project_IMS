@@ -10,6 +10,8 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.utils import resample
 
+from imblearn.combine import SMOTETomek 
+
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
 
 
@@ -159,6 +161,15 @@ def filter_target(y_train, binary_target, rest_binary_target):
 
         return y_train_filtered
 
+
+def SMOTE_sample_return(X, y, target_class: str):
+
+    top_features = get_top_features_rf(X, y, target_class)
+
+    X_resampled, y_resampled = SMOTETomek(sampling_strategy=0.05, random_state=42).fit_resample(X[top_features], y[target_class])
+
+    return X_resampled, y_resampled
+
 # create a n_stage_learning_model function that will take the model_iteration_list and train the model in each iteration
 def n_stage_learning_model(model_iteration_list, X_train, y_train, X_val, y_val, model, **kwargs):
     """
@@ -208,9 +219,25 @@ def n_stage_learning_model(model_iteration_list, X_train, y_train, X_val, y_val,
         y_train_filtered = filter_target(y_train, binary_target, rest_binary_target)
 
         X_train_filtered = X_train.loc[y_train_filtered.index]
+        print(y_train_filtered.head())  # Preview the data
+
+        if (sum(y_train_filtered['binary_target'])/y_train_filtered.shape[0]) < 0.05:
+        
+        # get the resampled data with SMOTE and return it | Includes featrue selection with top features of random forest
+            X_oversampled ,y_oversampled = SMOTE_sample_return(X_train_filtered, y_train_filtered, 'binary_target')
+
+            print(y_oversampled)
+        else:
+            
+            # get top features out of random forest classifier
+            top_features = get_top_features_rf(X_train_filtered, y_train_filtered, 'binary_target')
+            X_oversampled = X_train_filtered[top_features]
+            y_oversampled = y_train_filtered['binary_target']   
+        
+        
 
         # train the model of the node with the filtered features and target values inside the dictionary
-        model_dict[binary_target[0]].fit(X_train_filtered, y_train_filtered['binary_target'])
+        model_dict[binary_target[0]].fit(X_oversampled, y_oversampled)
 
         # predict the target
         # y_pred = model_dict[binary_target[0]].predict(X_val)
@@ -307,7 +334,6 @@ def model_evaluation(model, X_val, y_val):
 
 
 # This model returns us predicitons for our N-stage model
-
 def n_stage_pred(split_model_dict, split_list, X_input: pd.DataFrame, treshold_predict = False, treshold_value = [0.5]):
     """
 
@@ -346,17 +372,26 @@ def n_stage_pred(split_model_dict, split_list, X_input: pd.DataFrame, treshold_p
         if treshold_predict:
             
             if len(treshold_value) == 1:
-                pred = split_model_dict[binary_model_split].predict_proba(iteration_df)[:, 1]
+
+                # get columns that have been used for training 
+                train_feat = split_model_dict[binary_model_split].feature_names_in_
+                # predict with the treshold value 
+                pred = split_model_dict[binary_model_split].predict_proba(iteration_df[train_feat])[:, 1]
+
+                # Turn the boolean prediction into a binary value
                 pred = (pred > treshold_value[0]).astype(int)
             else:
                 
                 # predict with each value for the treshold
-                pred = split_model_dict[binary_model_split].predict_proba(iteration_df)[:, 1]
+                train_feat = split_model_dict[binary_model_split].feature_names_in_
+                pred = split_model_dict[binary_model_split].predict_proba(iteration_df[train_feat])[:, 1]
                 pred = (pred > treshold_value[treshold_index]).astype(int)
 
         else:
         # can replace this with a function that takes treshold into account. E.g. XGBoost prob_pred
-            pred = split_model_dict[binary_model_split].predict(iteration_df)
+            
+            train_feat = split_model_dict[binary_model_split].feature_names_in_
+            pred = split_model_dict[binary_model_split].predict(iteration_df)[train_feat]
 
         # increase the treshold index to get the next treshold value in next iteration
         treshold_index += 1
@@ -380,6 +415,83 @@ def n_stage_pred(split_model_dict, split_list, X_input: pd.DataFrame, treshold_p
     return y_pred
 
 
+
+def get_top_features_rf(X_train, y_train,  
+                        target_class,
+                        n_features = 10,
+                        sample_fraction=None,   
+                        n_estimators=100, 
+                        random_state=42):
+    """
+    Get top n important features using Random Forest Classifier.
+    
+    Parameters:
+    -----------
+    X_train : pd.DataFrame
+        Training features
+    y_train : pd.DataFrame
+        Training labels
+    n_features : int
+        Number of top features to return
+    target_class : str
+        Target class to predict
+    sample_fraction : float, optional (default = None)
+        values ranging (0,1). Uses a sample to create feat importance        
+    n_estimators : int, optional (default=100)
+        Number of trees in the forest
+    random_state : int, optional (default=42)
+        Random state for reproducibility
+        
+    Returns:
+    --------
+    np.array
+        Array of top n feature names
+    """
+    if sample_fraction:
+    # Get indices for each class
+        pos_idx = y_train[y_train[target_class] == 1].index
+        neg_idx = y_train[y_train[target_class] == 0].index
+        
+        # Calculate samples needed for each class
+        n_pos = int(len(pos_idx) * sample_fraction)
+        n_neg = int(len(neg_idx) * sample_fraction)
+        
+        # Sample from each class
+        pos_sample = np.random.choice(pos_idx, size=n_pos, replace=False)
+        neg_sample = np.random.choice(neg_idx, size=n_neg, replace=False)
+        
+        # Combine samples
+        sample_idx = np.concatenate([pos_sample, neg_sample])
+        X_train_sample = X_train.iloc[sample_idx]
+        y_train_sample = y_train.iloc[sample_idx]
+    else:
+        X_train_sample = X_train
+        y_train_sample = y_train
+
+
+
+    # Initialize and train Random Forest
+    rf = RandomForestClassifier(n_estimators=n_estimators, 
+                              random_state=random_state)
+    rf.fit(X_train_sample, y_train_sample[target_class])
+    
+    # Evaluate model
+    
+    # Get feature importances
+    importances = rf.feature_importances_
+    feature_importance_df = pd.DataFrame({
+        'Feature': X_train.columns,
+        'Importance': importances
+    })
+    
+    # Rank and select top features
+    feature_importance_df = feature_importance_df.sort_values(
+        by='Importance', ascending=False)
+    
+    return feature_importance_df['Feature'][:n_features].values
+
+
+
 def n_stage_pred_rest(split_model_dict, split_list, X_input: pd.DataFrame, rest_model, label_dict, treshold_predict = False, treshold_value = [0.5]):
 
     y_pred = n_stage_pred(split_model_dict, split_list, X_input, treshold_predict = treshold_predict, treshold_value = treshold_value)
@@ -387,10 +499,13 @@ def n_stage_pred_rest(split_model_dict, split_list, X_input: pd.DataFrame, rest_
     # check where model has not predicted yet 
     pred_index_rest = y_pred[y_pred['N_stage_pred'] == 'pred_placeholder'].index
 
+    # get the columns that have been used for training
+    train_feat = rest_model.feature_names_in_
+    # get the values that have not been predicted yet
     iteration_df = X_input.loc[pred_index_rest].copy()
 
     # predict the rest of the values with the rest model
-    pred = rest_model.predict(iteration_df)
+    pred = rest_model.predict(iteration_df[train_feat])
 
     # define as pd.series
     pred = pd.Series(pred, index = iteration_df.index)
@@ -427,3 +542,56 @@ def n_stage_pred_rest(split_model_dict, split_list, X_input: pd.DataFrame, rest_
     # print(confusion_matrix(y_val['minority_class_node_1'].values, predictions_node_1_tresh))
 
     # plot = sns.heatmap(confusion_matrix(y_val['minority_class_node_1'].values, predictions_node_1_tresh), annot=True, fmt='d', cmap='Blues')
+
+
+
+# use the filter_target
+# 
+def information_loss_n_stage(model_dict, model_split_list, X_val_encoded, y_val, treshold_predict = False, treshold_value = [0.5]):
+    # increase the treshold index to get the next treshold value in next iteration
+    treshold_index = 0 
+    for target_split in model_split_list:
+        print(f'We are prediciton for either {target_split[0]} = 1 \n and for: \n {target_split[1]} = 0')
+        print(f"for this split we are losing/keeping the followng values in this iteration\n")
+        
+
+    #     we filter for values that are in the target of target_split[0] and target_split[1]
+        y_iteration_target = filter_target(y_val, target_split[0], target_split[1])
+
+        X_iteration_values = X_val_encoded.loc[y_iteration_target.index]
+
+
+        if treshold_predict:
+        
+            if len(treshold_value) == 1:
+                iteration_pred = model_dict[target_split[0][0]].predict_proba(X_iteration_values)[:,1] > treshold_value[0]
+                iteration_pred = iteration_pred.astype(int)
+            
+            else:
+            
+                iteration_pred = model_dict[target_split[0][0]].predict_proba(X_iteration_values)[:,1] > treshold_value[0]
+                iteration_pred = iteration_pred.astype(int)
+                # increase the treshold index to get the next treshold value in next iteration
+                treshold_index += 1
+
+        else:
+        # get the predictions for the medical model
+            iteration_pred = model_dict[target_split[0][0]].predict(X_iteration_values)
+
+
+    # get report for the medical model
+        print(classification_report(y_iteration_target['binary_target'], iteration_pred))
+
+        fp, tn, fn = fp_tn_distribution(iteration_pred, y_iteration_target, minority_class_col = 'binary_target', normalize = True)
+
+    # fp are values which we lose
+        print('we are loosing the following values in this step:' , fp)
+        
+
+        print('we are keeping the following values in this step:' , tn, '\n')
+
+        print('the following values are misclassified as Negatives:', fn)
+        # tn are values which we keep`
+
+    return None
+
