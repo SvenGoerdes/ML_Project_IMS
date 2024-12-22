@@ -510,3 +510,20 @@ def plot_accident_date_distributions_separate(datasets, labels, column_name='Acc
     plt.suptitle('Accident Date Distributions Before and After Processing')
     plt.tight_layout()
     plt.show()
+
+def cramers_v(X, y):
+    """
+    Calculate Cramér's V for a categorical feature and a target.
+    :param X: Categorical feature (Pandas Series or array-like)
+    :param y: Target variable (Pandas Series or array-like)
+    :return: Cramér's V value
+    """
+    # Create the contingency table
+    df_contingency = pd.crosstab(X, y)
+    # Perform chi-square test
+    chi2, p, dof, expected = chi2_contingency(df_contingency.values)
+    # Calculate Cramér's V
+    n = df_contingency.sum().sum()  # Total number of observations
+    min_dim = min(df_contingency.shape) - 1  # Min between number of rows and columns - 1
+    cramers_v = np.sqrt(chi2 / (n * min_dim))  # Cramér's V formula
+    return cramers_v
