@@ -34,7 +34,6 @@ class ImputeBirthYearFromAccident(BaseEstimator, TransformerMixin):
             X.loc[filtered_rows.index, 'Accident Date'].dt.year - X.loc[filtered_rows.index, 'Age at Injury']
         )
 
-        
         return X
 
 
@@ -128,7 +127,7 @@ class ImputeProportionalTransformerColumn(BaseEstimator, TransformerMixin):
         imputed_values = np.random.choice(self.categories, size=missing_indices.sum(), p=self.proportions)
         
         # Create a new column with the name '<column> + imputed' and copy the original values
-        imputed_column_name = f"{self.column} Imputed"
+        imputed_column_name = f"{self.column}_Imputed"
         X_copy[imputed_column_name] = X_copy[self.column]
         
         # Fill in the missing values in the new column with the imputed values
@@ -298,7 +297,7 @@ class FillNaNValuesColumn(BaseEstimator, TransformerMixin):
         X_copy = X.copy()
         
         # Create a new column with the name '<column> + filled'
-        filled_column_name = f"{self.column} Imputed"
+        filled_column_name = f"{self.column}_Imputed"
         X_copy[filled_column_name] = X_copy[self.column]
         
         # Fill missing values in the new column
@@ -406,7 +405,7 @@ class ImputeUsingModeAfterGroupingColumn(BaseEstimator, TransformerMixin):
         X_copy = X.copy()
         
         # Create a new column with the name '<column_to_impute> + imputed'
-        imputed_column_name = f"{self.column_to_impute} Imputed"
+        imputed_column_name = f"{self.column_to_impute}_Imputed"
         X_copy[imputed_column_name] = X_copy[self.column_to_impute]
         
         # Impute missing values
@@ -471,7 +470,7 @@ class ImputeC2Date(BaseEstimator, TransformerMixin):
         X['Accident Date'] = pd.to_datetime(X['Accident Date'], errors='coerce')
         
         # Create a new column name for imputed 'C-2 Date'
-        imputed_column_name = 'C-2 Date Imputed'
+        imputed_column_name = 'C-2 Date_Imputed'
         
         # Copy 'C-2 Date' to the new column
         X[imputed_column_name] = X['C-2 Date']
