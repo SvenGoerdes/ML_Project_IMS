@@ -126,7 +126,7 @@ class ImputeProportionalTransformerColumn(BaseEstimator, TransformerMixin):
         # Generate imputed values based on the calculated proportions from before
         imputed_values = np.random.choice(self.categories, size=missing_indices.sum(), p=self.proportions)
         
-        # Create a new column with the name '<column> + imputed' and copy the original values
+        # Create a new column with the name '<column>_imputed' and copy the original values
         imputed_column_name = f"{self.column}_Imputed"
         X_copy[imputed_column_name] = X_copy[self.column]
         
@@ -446,8 +446,6 @@ class ImputeUsingModeAfterGroupingColumn(BaseEstimator, TransformerMixin):
         
 #         return X
     
-
-
 class ImputeC2Date(BaseEstimator, TransformerMixin):
     def __init__(self):
         self.avg_diff = None

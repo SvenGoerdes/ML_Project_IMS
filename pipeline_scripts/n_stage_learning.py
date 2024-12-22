@@ -164,7 +164,7 @@ def filter_target(y_train, binary_target, rest_binary_target):
 
 def SMOTE_sample_return(X, y, target_class: str):
 
-    top_features = get_top_features_rf(X, y, target_class)
+    top_features = get_top_features_rf(X, y, target_class, n_features = 5)
 
     X_resampled, y_resampled = SMOTETomek(sampling_strategy=0.05, random_state=42).fit_resample(X[top_features], y[target_class])
 
@@ -594,4 +594,3 @@ def information_loss_n_stage(model_dict, model_split_list, X_val_encoded, y_val,
         # tn are values which we keep`
 
     return None
-
