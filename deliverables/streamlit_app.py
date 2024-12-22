@@ -5,7 +5,8 @@ import joblib
 import sys
 import numpy as np
 from sklearn.pipeline import Pipeline
-import matplotlib as plt
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 # Import custom_transformer methods for our pipelines. We do this to keep the notebook clean and easy to read and to be able to adapt code quickly and easily
 sys.path.append('../pipeline_scripts')
@@ -246,7 +247,7 @@ user_inputs['Industry Code'] = Ind_dict[user_inputs['Industry Code Description']
 unknown_values = {'Alternative Dispute Resolution': 'U', 'Alternative Dispute Resolution': 'UNKNOWN',   'Carrier Type': 'UNKNOWN', 'County of Injury': 'UNKNOWN',
     'Gender': 'U','Medical Fee Region': 'UK'}
 
-st.write(user_inputs['Alternative Dispute Resolution'])
+# st.write(user_inputs['Alternative Dispute Resolution'])
 
 
 for key, value in unknown_values.items():
@@ -331,6 +332,9 @@ if st.button("Predict"):
 
     # make prediction 
     prediction = final_model.predict(user_inputs_df[model_features])
+    prediction_prob = final_model.predict_proba(user_inputs_df[model_features])[0]
+
+
 
 
 
@@ -349,14 +353,46 @@ if st.button("Predict"):
     # invert the prediction
     inverted_prediction = {v: k for k, v in claim_injury_type_mapping.items()}
 
+    # create a dataframe with probabilities
+    sorted_labels = sorted(inverted_prediction.keys())  # [0, 1, 2, 3, 4, 5, 6, 7]
+    class_names = [inverted_prediction[i] for i in sorted_labels]
+    prediction_prob_df = pd.DataFrame({
+    "Class": class_names,
+    "Probability": prediction_prob
+    })
+
+
+
     # st.write(inverted_prediction[prediction[0]])
 
     prediction_string = inverted_prediction[prediction[0]]
 
-    # prediction_prob = final_model.predict_proba(user_inputs_df[model_features])
+    st.subheader(f"The Prediction for this indivdual is: {prediction_string}")
+
+
+
+    # 8. Create a bar chart with Seaborn
+    sns.set_theme()
+    fig, ax = plt.subplots(figsize=(6, 4))
+    sns.barplot(data=prediction_prob_df, x="Class", y="Probability", ax=ax)
+    ax.set_title(f"Predicted Probabilities")
+    ax.set_ylim(0, 1.0)
+    
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
+    # Annotate each bar with the numeric probability
+    for p in ax.patches:
+        height = p.get_height()
+        ax.text(
+            p.get_x() + p.get_width()/2.0,
+            height + 0.01,
+            f"{height:.2f}",
+            ha="center"
+        )
+
+    # 9. Display the figure in Streamlit
+    st.pyplot(fig)
 
     # Display the prediction result
-    st.write("The Prediction for this indivdual is: ", prediction_string)
     
     # Display the prediction probability
     # st.write(f"Prediction Probability: {prediction_prob[0]:.2f}")
