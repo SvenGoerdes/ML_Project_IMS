@@ -3,6 +3,7 @@ from category_encoders import TargetEncoder
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from scipy.stats import chi2_contingency
 
 def missing_data(df):
     """
