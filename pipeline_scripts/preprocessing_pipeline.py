@@ -4,26 +4,55 @@ from sklearn.preprocessing import LabelEncoder, FunctionTransformer, OneHotEncod
 import pandas as pd
 import numpy as np
 
-class BinaryEncoder(BaseEstimator, TransformerMixin):
-    def __init__(self, binary_columns):
-        self.binary_columns = binary_columns
-        self.encodings = {}  # Store the mapping for each column
 
-    # Fit method creates a dictionary which defines the mapping. 
-    def fit(self, X, y):
+class BinaryEncoder(BaseEstimator, TransformerMixin):
+    """
+    A custom transformer for encoding binary columns into 0 and 1.
+    Expects exactly two unique values in each column during fit.
+    """
+    def __init__(self, binary_columns):
+        """
+        :param binary_columns: list of column names to be binary-encoded
+        """
+        self.binary_columns = binary_columns
+        self.encodings = {}  # Dictionary to store the mapping for each column
+
+    def fit(self, X, y=None):
+        """
+        Learn the encoding (0/1) for each binary column based on all unique values
+        in the training set.
+        """
+        # Convert X to DataFrame if it's not (optional safety check)
+        X = pd.DataFrame(X).copy()
+
+        for col in self.binary_columns:
+            # Get unique values from the training data
+            unique_values = sorted(X[col].dropna().unique())
+            
+            if len(unique_values) != 2:
+                raise ValueError(f"Column '{col}' does not have exactly two unique values.")
+            
+            # Store the mapping from the two unique values to 0 and 1
+            self.encodings[col] = {unique_values[0]: 0, unique_values[1]: 1}
+        
         return self
 
     def transform(self, X):
-        X = X.copy()  # Avoid modifying the original DataFrame
+        """
+        Apply the learned mappings to any new data (including single rows).
+        """
+        X = pd.DataFrame(X).copy()
+        
         for col in self.binary_columns:
-            unique_values = sorted(X[col].unique())
-
-            if len(unique_values) != 2:
-                raise ValueError(f"Column '{col}' does not have exactly two unique values.")
-
-            X[f'{col}_binary'] = X[col].map({unique_values[0]: 0, unique_values[1]: 1})
-
+            if col not in self.encodings:
+                raise ValueError(f"No encoding found for column '{col}'. "
+                                 "Did you fit the transformer first?")
+            
+            # Map the column to its binary-encoded values
+            X[f'{col}_binary'] = X[col].map(self.encodings[col])
+        
         return X
+
 
 class MultipleTargetEncoder(BaseEstimator, TransformerMixin):
     def __init__(self,
