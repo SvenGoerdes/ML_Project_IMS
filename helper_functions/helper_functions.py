@@ -288,4 +288,234 @@ def iqr_date(df, date_column):
     print(f"Upper Bound Date for {date_column}: {upper_bound_date}")
     print(f"Number of outliers in {date_column}: {outlier_count}")
 
+<<<<<<< Updated upstream
     return lower_bound_date, upper_bound_date
+=======
+    return lower_bound_date, upper_bound_date
+
+
+
+def handle_outliers_age_birth(X, dataset_type, age_column='Age at Injury', birth_year_column='Birth Year', 
+                    lower_bound=14, z_score_threshold=3, train_stats=None):
+    """
+    Handle outliers by either dropping (train) or setting to NaN (val/test) based on dataset type.
+
+    Parameters:
+    - X: DataFrame to process.
+    - dataset_type: 'train', 'val', or 'test'.
+    - age_column: Name of the 'Age at Injury' column.
+    - birth_year_column: Name of the 'Birth Year' column.
+    - lower_bound: Minimum valid age.
+    - z_score_threshold: Z-score threshold for upper bound.
+    - train_stats: Dictionary containing mean and std from the training set (optional for train).
+
+    Returns:
+    - Transformed DataFrame.
+    - Dictionary containing the mean and std from the training set (if dataset_type='train').
+    """
+    if dataset_type == 'train':
+        # Compute mean and std for training data
+        age_data = X[age_column].dropna()
+        mean = age_data.mean()
+        std = age_data.std()
+    elif train_stats is not None:
+        # Use mean and std from training data
+        mean = train_stats['mean']
+        std = train_stats['std']
+    else:
+        raise ValueError("X_train stats must be provided for validation or test datasets.")
+
+    # Calculate the upper bound for outliers
+    upper_bound = mean + z_score_threshold * std
+
+    X_copy = X.copy()
+    
+    # Calculate z-scores for 'Age at Injury'
+    z_scores = (X_copy[age_column] - mean) / std
+
+    # Initialize counter for outliers
+    num_outliers = 0
+
+    # Detect outliers (both for training and non-training datasets)
+    outlier_condition = (z_scores > z_score_threshold) | (X_copy[age_column] < lower_bound)
+    num_outliers = outlier_condition.sum()
+
+    if dataset_type == 'train':
+        # Drop outliers for training
+        X_copy.loc[outlier_condition, age_column] = np.nan
+    else:
+        # Set outliers to NaN for validation/test (instead of capping)
+        X_copy.loc[outlier_condition, age_column] = np.nan
+
+    # Set 'Birth Year' to NaN only where 'Age at Injury' is NaN due to outliers
+    X_copy.loc[outlier_condition, birth_year_column] = np.nan
+
+    # Print information
+    print(f"Dataset: {dataset_type}")
+    print(f"Number of outliers detected: {num_outliers}")
+    print(f"Lower bound: {lower_bound}")
+    print(f"Upper bound: {upper_bound:.2f}")
+    print("-" * 40)
+
+    if dataset_type == 'train':
+        return X_copy, {'mean': mean, 'std': std}
+    else:
+        return X_copy
+    
+
+
+    
+def process_birth_year(df, accident_date_col='Accident Date', birth_year_col='Birth Year', age_col='Calculated Age at Injury'):
+    """
+    Process the age at injury and handle invalid values in a DataFrame.
+
+    Parameters:
+        df (pd.DataFrame): Input DataFrame.
+        accident_date_col (str): Name of the 'Accident Date' column.
+        birth_year_col (str): Name of the 'Birth Year' column.
+        age_col (str): Name of the column to store the calculated age at injury.
+        drop_accident_year (bool): Whether to drop the 'Accident Year' column after processing.
+
+    Returns:
+        pd.DataFrame: Transformed DataFrame with calculated age and invalid rows set to NaN.
+    """
+    # Ensure 'Accident Date' is datetime
+    df[accident_date_col] = pd.to_datetime(df[accident_date_col], errors='coerce')
+    
+    # Extract year from 'Accident Date'
+    df['Accident Year'] = df[accident_date_col].dt.year
+    
+    # Calculate age at injury
+    df[age_col] = df['Accident Year'] - df[birth_year_col]
+    
+    # Set invalid ages to NaN
+    invalid_condition = (df[age_col] < 14) | (df[age_col] > 83)
+    df.loc[invalid_condition, [age_col, birth_year_col]] = np.nan
+    
+    df.drop(columns=['Accident Year','Calculated Age at Injury'], inplace=True)    
+    
+    # Print summary
+    print(f"Number of rows where {birth_year_col} set to NaN: {invalid_condition.sum()}")
+    
+    return df
+
+
+
+def remove_ime4_outliers_train(df, column, threshold=20):
+    # Create a copy of the input DataFrame
+    df_cleaned = df.copy()
+    
+    # Count how many rows have values greater than the threshold
+    outliers_count = (df_cleaned[column] > threshold).sum()
+    
+    # Remove the outliers, but keep rows where the column is NaN
+    df_cleaned = df_cleaned[(df_cleaned[column] <= threshold) | df_cleaned[column].isna()]
+    
+    # Print the number of removed rows
+    print(f"Removed: {outliers_count} outliers")
+    
+    return df_cleaned
+
+
+def cap_ime4_outliers(df, column, threshold=20):
+    df[column] = df[column].clip(upper=threshold)
+    return df
+
+
+
+def handle_outliers_with_log_iqr(train_df, val_df, test_df, column='Average Weekly Wage'):
+    """
+    Handles outliers in a specified column using log transformation and IQR.
+    Removes non-zero outliers in the training set and caps non-zero values in validation and test sets.
+    
+    Parameters:
+        train_df (pd.DataFrame): Training dataset
+        val_df (pd.DataFrame): Validation dataset
+        test_df (pd.DataFrame): Test dataset
+        column (str): Column name for outlier handling
+    
+    Returns:
+        pd.DataFrame, pd.DataFrame, pd.DataFrame: Modified training, validation, and test datasets
+    """
+    # Copy datasets to avoid modifying the originals
+    train_df = train_df.copy()
+    val_df = val_df.copy()
+    test_df = test_df.copy()
+    
+    # Filter out zero values from the training set for outlier detection
+    train_non_zero = train_df[train_df[column] > 0].copy()
+    
+    # Apply log transformation to the non-zero values
+    train_non_zero['log_' + column] = np.log(train_non_zero[column])
+    
+    # Calculate IQR on the log-transformed values
+    Q1 = train_non_zero['log_' + column].quantile(0.25)
+    Q3 = train_non_zero['log_' + column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    # Calculate lower and upper bounds in the original scale
+    lower_bound = np.exp(Q1 - 1.5 * IQR)
+    upper_bound = np.exp(Q3 + 1.5 * IQR)
+    print(f"Lower Bound: {lower_bound}")
+    print(f"Upper Bound: {upper_bound}")
+    
+    # Remove non-zero outliers from the training set, but keep NaN values
+    initial_train_size = len(train_df)
+    train_df = train_df[(train_df[column].isna()) | (train_df[column] == 0) | ((train_df[column] >= lower_bound) & (train_df[column] <= upper_bound))]
+    outliers_removed = initial_train_size - len(train_df)
+    print(f"Removed {outliers_removed} outliers from the training set.")
+    
+    # Cap non-zero values in the validation and test datasets
+    for df in [val_df, test_df]:
+        non_zero_mask = df[column] > 0  # Identify non-zero elements
+        df.loc[non_zero_mask, column] = df.loc[non_zero_mask, column].clip(lower=lower_bound, upper=upper_bound)
+    
+    # Drop the temporary column from the filtered training dataset
+    train_non_zero.drop(columns=['log_' + column], inplace=True)
+    
+    return train_df, val_df, test_df
+
+
+def plot_accident_date_distributions_separate(datasets, labels, column_name='Accident Date'):
+    """
+    Plot the distributions of Accident Date for multiple datasets in separate subplots.
+
+    Parameters:
+    - datasets: List of DataFrames.
+    - labels: List of labels for the datasets.
+    - column_name: Name of the accident date column to plot.
+    """
+    fig, axes = plt.subplots(1, 2, figsize=(15, 6), sharey=True)
+    
+    for ax, data, label in zip(axes, datasets, labels):
+        sns.kdeplot(data[column_name], ax=ax, fill=True, alpha=0.5)
+        ax.set_title(f'{label} Distribution')
+        ax.set_xlabel('Accident Date')
+        ax.set_ylabel('Density')
+        ax.tick_params(axis='x', rotation=45)
+
+    plt.suptitle('Accident Date Distributions Before and After Processing')
+    plt.tight_layout()
+    plt.show()
+
+
+def cramers_v(X, y):
+    """
+    Calculate Cramér's V for a categorical feature and a target.
+    :param X: Categorical feature (Pandas Series or array-like)
+    :param y: Target variable (Pandas Series or array-like)
+    :return: Cramér's V value
+    """
+    # Create the contingency table
+    df_contingency = pd.crosstab(X, y)
+
+    # Perform chi-square test
+    chi2, p, dof, expected = chi2_contingency(df_contingency.values)
+
+    # Calculate Cramér's V
+    n = df_contingency.sum().sum()  # Total number of observations
+    min_dim = min(df_contingency.shape) - 1  # Min between number of rows and columns - 1
+    cramers_v = np.sqrt(chi2 / (n * min_dim))  # Cramér's V formula
+
+    return cramers_v
+>>>>>>> Stashed changes
