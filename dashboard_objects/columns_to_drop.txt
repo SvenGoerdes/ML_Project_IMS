@@ -1,0 +1,35 @@
+Accident Date
+Alternative Dispute Resolution
+Attorney/Representative
+COVID-19 Indicator
+Gender
+Assembly Date
+Average Weekly Wage
+Birth Year
+Carrier Name
+Carrier Type
+C-2 Date
+C-3 Date
+County of Injury
+District Name
+First Hearing Date
+Industry Code
+Industry Code Description
+First Hearing Date
+Medical Fee Region
+Days_between_Assembly Date_Accident Date
+Days_between_C-2 Date_Imputed_Accident Date
+Average Weekly Wage
+WCIO Cause of Injury Code
+WCIO Cause of Injury Description
+WCIO Nature of Injury Code
+WCIO Nature of Injury Description
+WCIO Part Of Body Code
+WCIO Part Of Body Description
+Zip Code
+Days_between_Assembly Date_Accident Date
+Days_between_C-2 Date_Imputed_Accident Date
+Accident Date_Season
+Accident Dateyear
+Accident Date_day_of_week
+Average Weekly Wage_Imputed
