@@ -1,4 +1,4 @@
-## Machine Learnign Project Group 32
+Machine Learnign Project Group 32
 
 
 Dashboard:
