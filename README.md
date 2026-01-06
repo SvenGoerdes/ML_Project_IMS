@@ -1,4 +1,6 @@
-Machine Learnign Project Group 32
+Machine Learning Project developed during Master's in Data Science and Advanced Analytics at NOVA IMS.
+
+We build a machine learning model to solve a classification prolme
 
 
 _Dashboard:_
